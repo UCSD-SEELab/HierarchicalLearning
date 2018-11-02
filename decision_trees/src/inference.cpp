@@ -1,7 +1,4 @@
 #include "inference.h"
-#include "iostream"
-
-using namespace std;
 
 const float splits[][2] = {{2.963}, {-4.885, 4.806}, {-0.115, 0.568}, {0.268}, {5443.253},\
 	{1989.434}, {25264.602, 59657.531}, {-2.084, -2.205}, {5.657}};
@@ -80,3 +77,5 @@ int accInterval(float *feats) {
 	retVal += whichInterval((float *)splits[iter], splitLengths[iter], feats[iter]);
 	return retVal;
 }
+
+ 
