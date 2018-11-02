@@ -1,6 +1,10 @@
 #include "inference.h"
 #include <stdio.h>
 
+const float splits[][2] = {{2.963}, {-4.885, 4.806}, {-0.115, 0.568}, {0.268}, {5443.253},\
+	{1989.434}, {25264.602, 59657.531}, {-2.084, -2.205}, {5.657}};
+const int splitLengths[9] = {1, 2, 2, 1, 1, 1, 2, 2, 1};
+
 int whichInterval(float *partitions, int length, float val) {
 	int interval;
 
@@ -24,7 +28,8 @@ int whichInterval(float *partitions, int length, float val) {
 }
 
 int binSearch(float *partitions, int length, float val) {
-	int low, high, mid, i1, i2, interval;
+	int low, high, mid, interval;
+	float i1, i2;
 	
 	low = 0;
 	high = length - 1;
@@ -47,3 +52,17 @@ int binSearch(float *partitions, int length, float val) {
 	else
 		return length;
 }
+
+int accInterval(float *feats) {
+	int iter, retVal, intrvl;
+
+	retVal = 0;
+
+	for (iter = 0; iter < 9; iter++) {
+		//intrvl = whichInterval(splits[iter], splitLengths[iter], feats[iter]);
+	}
+	
+	return 0;
+}
+
+ 

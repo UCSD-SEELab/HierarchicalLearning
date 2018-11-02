@@ -1,4 +1,4 @@
-CC=gcc
+CC=g++
 CFLAGS=-I -Wall
 DEPS = inference.h
 OBJ = inference.o test.o
