@@ -85,7 +85,7 @@ long sleep_time; // to store sleep time, should be signed
 	void init_lookup_table() {
 		float e = 2.718281828;
 		for (uint8_t i = 0; i < LOOKUP_LENGTH+1; ++i) {
-			// e^(5) ~ e^(-5)
+			//i=0->e^(5) ~ i=LOOKUP_LENGTH->e^(-5)
 			float exp = (float)(-i)/RATIO+HALF_LOOKUP_RANGE;
 			lookup_table[i] = pow(e, exp);
 			// Serial.printf("%d %f %f\r\n", i, exp, lookup_table[i]); // print out for check
@@ -98,7 +98,7 @@ long sleep_time; // to store sleep time, should be signed
 	inline float sigmoid_lookup(float x) {
 		if (x > HALF_LOOKUP_RANGE) // X > 5, return 0
 			return 0;
-		if (-x > HALF_LOOKUP_RANGE) // x < -5, return e^(5)
+		if (-x > HALF_LOOKUP_RANGE) // x < -5, return e^(-5)
 			return lookup_table[LOOKUP_LENGTH];
 		uint8_t index = floor((-1)*(x-HALF_LOOKUP_RANGE)*RATIO);
 		return lookup_table[index];
