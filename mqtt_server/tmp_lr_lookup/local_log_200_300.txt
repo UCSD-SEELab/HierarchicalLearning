@@ -1,0 +1,4 @@
+S	prev:42259	cur:42929	sleep:330	len:300	c:70	r:584	ready:654
+S	prev:43275	cur:43940	sleep:335	len:300	c:73	r:581	ready:655
+S	prev:44282	cur:44940	sleep:342	len:300	c:70	r:574	ready:645
+S	prev:45289	cur:45511	sleep:778	len:100	c:23	r:188	ready:213

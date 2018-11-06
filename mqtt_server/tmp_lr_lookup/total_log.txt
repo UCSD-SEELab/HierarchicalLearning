@@ -1,0 +1,390 @@
+200 200
+sync 18298
+house.hand
+house.hand
+house.hand
+house.hand
+house.hand
+S	prev:18318	cur:18761	sleep:557	len:200	c:41	r:392	ready:435
+S	prev:19333	cur:19784	sleep:549	len:200	c:43	r:397	ready:441
+S	prev:20340	cur:20784	sleep:556	len:200	c:49	r:386	ready:436
+S	prev:21347	cur:21788	sleep:559	len:200	c:50	r:380	ready:432
+S	prev:22354	cur:22788	sleep:566	len:200	c:44	r:381	ready:426
+
+write to tmp_lr_lookup/local_log_200_200.txt
+200 220
+sync 23404
+house.hand
+house.hand
+house.hand
+house.hand
+house.hand
+S	prev:23435	cur:23923	sleep:512	len:220	c:52	r:426	ready:479
+S	prev:24452	cur:24945	sleep:507	len:220	c:51	r:433	ready:485
+S	prev:25459	cur:25945	sleep:514	len:220	c:47	r:430	ready:478
+S	prev:26466	cur:26948	sleep:518	len:220	c:53	r:419	ready:473
+S	prev:27473	cur:27737	sleep:736	len:120	c:30	r:224	ready:256
+
+write to tmp_lr_lookup/local_log_200_220.txt
+200 240
+sync 28500
+house.hand
+house.hand
+house.hand
+house.hand
+house.hand
+S	prev:28518	cur:29048	sleep:470	len:240	c:54	r:468	ready:522
+S	prev:29534	cur:30076	sleep:458	len:240	c:58	r:467	ready:526
+S	prev:30541	cur:31070	sleep:471	len:240	c:61	r:459	ready:521
+S	prev:31548	cur:32072	sleep:476	len:240	c:60	r:453	ready:514
+S	prev:32555	cur:32652	sleep:903	len:40	c:12	r:74	ready:87
+
+write to tmp_lr_lookup/local_log_200_240.txt
+200 260
+sync 33590
+house.hand
+house.hand
+house.hand
+house.hand
+S	prev:33610	cur:34185	sleep:425	len:260	c:60	r:504	ready:565
+S	prev:34626	cur:35205	sleep:421	len:260	c:67	r:502	ready:570
+S	prev:35633	cur:36204	sleep:429	len:260	c:62	r:498	ready:563
+S	prev:36640	cur:37118	sleep:522	len:220	c:54	r:415	ready:470
+
+write to tmp_lr_lookup/local_log_200_260.txt
+200 280
+sync 37666
+house.hand
+house.hand
+house.hand
+house.hand
+S	prev:37684	cur:38302	sleep:382	len:280	c:62	r:548	ready:610
+S	prev:38700	cur:39320	sleep:380	len:280	c:64	r:547	ready:612
+S	prev:39707	cur:40323	sleep:384	len:280	c:70	r:534	ready:605
+N	prev:40714	cur:42208	sleep:-494	len:160	c:35	r:304	ready:340
+
+write to tmp_lr_lookup/local_log_200_280.txt
+200 300
+sync 42239
+house.hand
+house.hand
+house.hand
+house.hand
+S	prev:42259	cur:42929	sleep:330	len:300	c:70	r:584	ready:654
+S	prev:43275	cur:43940	sleep:335	len:300	c:73	r:581	ready:655
+S	prev:44282	cur:44940	sleep:342	len:300	c:70	r:574	ready:645
+S	prev:45289	cur:45511	sleep:778	len:100	c:23	r:188	ready:213
+
+write to tmp_lr_lookup/local_log_200_300.txt
+200 320
+sync 46323
+house.hand
+house.hand
+house.hand
+house.hand
+S	prev:46348	cur:47053	sleep:295	len:320	c:80	r:617	ready:697
+S	prev:47364	cur:48071	sleep:293	len:320	c:76	r:621	ready:699
+N	prev:48371	cur:50175	sleep:-804	len:320	c:79	r:604	ready:685
+S	prev:50182	cur:50277	sleep:905	len:40	c:9	r:77	ready:87
+
+write to tmp_lr_lookup/local_log_200_320.txt
+200 340
+sync 51208
+house.hand
+house.hand
+house.hand
+N	prev:51229	cur:53162	sleep:-933	len:340	c:80	r:660	ready:741
+S	prev:53177	cur:53927	sleep:250	len:340	c:85	r:653	ready:740
+S	prev:54187	cur:54881	sleep:306	len:320	c:71	r:612	ready:685
+
+write to tmp_lr_lookup/local_log_200_340.txt
+200 360
+sync 55214
+house.hand
+house.hand
+house.hand
+S	prev:55235	cur:56029	sleep:206	len:360	c:84	r:702	ready:786
+S	prev:56250	cur:57040	sleep:210	len:360	c:91	r:687	ready:781
+S	prev:57257	cur:57864	sleep:393	len:280	c:61	r:536	ready:598
+
+write to tmp_lr_lookup/local_log_200_360.txt
+200 380
+sync 58296
+house.hand
+house.hand
+house.hand
+S	prev:58318	cur:59155	sleep:163	len:380	c:93	r:736	ready:829
+S	prev:59333	cur:60167	sleep:166	len:380	c:91	r:731	ready:824
+S	prev:60340	cur:60864	sleep:476	len:240	c:64	r:446	ready:512
+
+write to tmp_lr_lookup/local_log_200_380.txt
+200 400
+sync 61372
+house.hand
+house.hand
+house.hand
+S	prev:61389	cur:62272	sleep:117	len:400	c:94	r:778	ready:873
+S	prev:62404	cur:63281	sleep:123	len:400	c:95	r:769	ready:867
+S	prev:63411	cur:63845	sleep:566	len:200	c:51	r:374	ready:426
+
+write to tmp_lr_lookup/local_log_200_400.txt
+700 200
+sync 64438
+house.hand
+house.hand
+house.hand
+house.hand
+house.hand
+S	prev:64457	cur:64899	sleep:558	len:200	c:45	r:389	ready:434
+S	prev:65473	cur:65922	sleep:551	len:200	c:46	r:394	ready:441
+S	prev:66480	cur:66924	sleep:556	len:200	c:42	r:393	ready:436
+S	prev:67487	cur:67929	sleep:558	len:200	c:46	r:385	ready:432
+S	prev:68494	cur:68929	sleep:565	len:200	c:47	r:378	ready:426
+
+write to tmp_lr_lookup/local_log_700_200.txt
+700 220
+sync 69530
+house.hand
+house.hand
+house.hand
+house.hand
+house.hand
+S	prev:69550	cur:70037	sleep:513	len:220	c:51	r:427	ready:478
+N	prev:70565	cur:72129	sleep:-564	len:220	c:46	r:436	ready:485
+N	prev:72136	cur:73614	sleep:-478	len:220	c:53	r:424	ready:478
+S	prev:73621	cur:74103	sleep:518	len:220	c:52	r:421	ready:474
+S	prev:74634	cur:74899	sleep:735	len:120	c:31	r:224	ready:257
+
+write to tmp_lr_lookup/local_log_700_220.txt
+700 240
+sync 75661
+house.hand
+house.hand
+house.hand
+house.hand
+house.hand
+S	prev:75679	cur:76209	sleep:470	len:240	c:57	r:465	ready:522
+N	prev:76694	cur:78588	sleep:-894	len:240	c:58	r:467	ready:527
+S	prev:78595	cur:79124	sleep:471	len:240	c:62	r:457	ready:521
+S	prev:79602	cur:80124	sleep:478	len:240	c:52	r:459	ready:513
+S	prev:80609	cur:80704	sleep:905	len:40	c:11	r:75	ready:87
+
+write to tmp_lr_lookup/local_log_700_240.txt
+700 260
+sync 81637
+house.hand
+house.hand
+house.hand
+house.hand
+S	prev:81656	cur:82245	sleep:411	len:260	c:57	r:507	ready:564
+S	prev:82671	cur:83253	sleep:418	len:260	c:62	r:506	ready:570
+S	prev:83678	cur:84249	sleep:429	len:260	c:66	r:496	ready:563
+S	prev:84685	cur:85163	sleep:522	len:220	c:49	r:420	ready:470
+
+write to tmp_lr_lookup/local_log_700_260.txt
+700 280
+sync 85711
+house.hand
+house.hand
+house.hand
+house.hand
+N	prev:85733	cur:87560	sleep:-827	len:280	c:65	r:544	ready:610
+S	prev:87576	cur:88200	sleep:376	len:280	c:66	r:544	ready:612
+S	prev:88583	cur:89199	sleep:384	len:280	c:62	r:542	ready:605
+S	prev:89590	cur:89938	sleep:652	len:160	c:38	r:301	ready:340
+
+write to tmp_lr_lookup/local_log_700_280.txt
+700 300
+sync 90617
+house.hand
+house.hand
+house.hand
+house.hand
+S	prev:92049	cur:92711	sleep:338	len:300	c:70	r:584	ready:654
+S	prev:93064	cur:93729	sleep:335	len:300	c:70	r:583	ready:655
+S	prev:94071	cur:94726	sleep:345	len:300	c:72	r:572	ready:645
+S	prev:95078	cur:95299	sleep:779	len:100	c:23	r:189	ready:213
+
+write to tmp_lr_lookup/local_log_700_300.txt
+700 320
+sync 96104
+house.hand
+house.hand
+house.hand
+house.hand
+S	prev:96122	cur:96846	sleep:276	len:320	c:73	r:624	ready:697
+S	prev:97143	cur:97850	sleep:293	len:320	c:74	r:624	ready:699
+S	prev:98150	cur:98843	sleep:307	len:320	c:74	r:609	ready:684
+S	prev:99157	cur:99252	sleep:905	len:40	c:10	r:76	ready:87
+
+write to tmp_lr_lookup/local_log_700_320.txt
+700 340
+sync 100185
+house.hand
+house.hand
+house.hand
+S	prev:100204	cur:100954	sleep:250	len:340	c:82	r:658	ready:741
+S	prev:101219	cur:101970	sleep:249	len:340	c:84	r:654	ready:740
+S	prev:102226	cur:102918	sleep:308	len:320	c:82	r:601	ready:684
+
+write to tmp_lr_lookup/local_log_700_340.txt
+700 360
+sync 103253
+house.hand
+house.hand
+house.hand
+S	prev:103272	cur:104066	sleep:206	len:360	c:81	r:705	ready:786
+S	prev:104287	cur:105076	sleep:211	len:360	c:91	r:687	ready:781
+S	prev:105294	cur:105900	sleep:394	len:280	c:64	r:533	ready:598
+
+write to tmp_lr_lookup/local_log_700_360.txt
+700 380
+sync 106322
+house.hand
+house.hand
+house.hand
+S	prev:106341	cur:107178	sleep:163	len:380	c:91	r:737	ready:829
+S	prev:107357	cur:108190	sleep:167	len:380	c:94	r:727	ready:823
+S	prev:108364	cur:108885	sleep:479	len:240	c:56	r:455	ready:512
+
+write to tmp_lr_lookup/local_log_700_380.txt
+700 400
+sync 109393
+house.hand
+house.hand
+house.hand
+S	prev:109413	cur:110294	sleep:119	len:400	c:99	r:774	ready:873
+S	prev:110428	cur:111303	sleep:125	len:400	c:90	r:775	ready:867
+N	prev:111435	cur:112962	sleep:-527	len:200	c:47	r:378	ready:426
+
+write to tmp_lr_lookup/local_log_700_400.txt
+5000 200
+sync 112991
+house.hand
+house.hand
+house.hand
+house.hand
+house.hand
+S	prev:113008	cur:113452	sleep:556	len:200	c:45	r:389	ready:434
+S	prev:114023	cur:114474	sleep:549	len:200	c:47	r:393	ready:442
+S	prev:115030	cur:115475	sleep:555	len:200	c:41	r:393	ready:436
+S	prev:116041	cur:116484	sleep:557	len:200	c:48	r:383	ready:433
+S	prev:117048	cur:117485	sleep:563	len:200	c:49	r:376	ready:426
+
+write to tmp_lr_lookup/local_log_5000_200.txt
+5000 220
+sync 118078
+house.hand
+house.hand
+house.hand
+house.hand
+house.hand
+S	prev:118101	cur:118587	sleep:514	len:220	c:51	r:426	ready:478
+S	prev:119116	cur:119609	sleep:507	len:220	c:45	r:435	ready:485
+S	prev:120123	cur:120609	sleep:514	len:220	c:50	r:426	ready:478
+S	prev:121130	cur:121612	sleep:518	len:220	c:49	r:422	ready:473
+S	prev:122137	cur:122401	sleep:736	len:120	c:28	r:227	ready:256
+
+write to tmp_lr_lookup/local_log_5000_220.txt
+5000 240
+sync 123175
+house.hand
+house.hand
+house.hand
+house.hand
+house.hand
+S	prev:123193	cur:123726	sleep:467	len:240	c:52	r:469	ready:522
+S	prev:124208	cur:124745	sleep:463	len:240	c:60	r:465	ready:527
+S	prev:125215	cur:125744	sleep:471	len:240	c:50	r:470	ready:521
+S	prev:126222	cur:126745	sleep:477	len:240	c:55	r:457	ready:513
+S	prev:127229	cur:127324	sleep:905	len:40	c:9	r:77	ready:87
+
+write to tmp_lr_lookup/local_log_5000_240.txt
+5000 260
+sync 128255
+house.hand
+house.hand
+house.hand
+house.hand
+S	prev:128273	cur:128846	sleep:427	len:260	c:63	r:501	ready:564
+S	prev:129289	cur:129867	sleep:422	len:260	c:63	r:506	ready:570
+S	prev:130296	cur:130867	sleep:429	len:260	c:66	r:496	ready:563
+S	prev:131303	cur:131781	sleep:522	len:220	c:49	r:420	ready:470
+
+write to tmp_lr_lookup/local_log_5000_260.txt
+5000 280
+sync 132332
+house.hand
+house.hand
+house.hand
+house.hand
+S	prev:132354	cur:132973	sleep:381	len:280	c:70	r:540	ready:610
+S	prev:133369	cur:133990	sleep:379	len:280	c:73	r:538	ready:613
+S	prev:134376	cur:134989	sleep:387	len:280	c:68	r:535	ready:605
+S	prev:135383	cur:135731	sleep:652	len:160	c:37	r:302	ready:340
+
+write to tmp_lr_lookup/local_log_5000_280.txt
+5000 300
+sync 136410
+house.hand
+house.hand
+house.hand
+house.hand
+S	prev:136434	cur:137097	sleep:337	len:300	c:71	r:583	ready:654
+S	prev:137450	cur:138113	sleep:337	len:300	c:73	r:581	ready:655
+S	prev:138457	cur:139111	sleep:346	len:300	c:77	r:567	ready:645
+S	prev:139464	cur:139687	sleep:777	len:100	c:23	r:189	ready:213
+
+write to tmp_lr_lookup/local_log_5000_300.txt
+5000 320
+sync 140494
+house.hand
+house.hand
+house.hand
+house.hand
+S	prev:140512	cur:141217	sleep:295	len:320	c:75	r:622	ready:697
+S	prev:141527	cur:142235	sleep:292	len:320	c:74	r:623	ready:700
+S	prev:142534	cur:143229	sleep:305	len:320	c:71	r:611	ready:684
+S	prev:143541	cur:143636	sleep:905	len:40	c:12	r:74	ready:87
+
+write to tmp_lr_lookup/local_log_5000_320.txt
+5000 340
+sync 144572
+house.hand
+house.hand
+house.hand
+S	prev:144590	cur:145339	sleep:251	len:340	c:81	r:660	ready:741
+S	prev:145605	cur:146353	sleep:252	len:340	c:80	r:658	ready:740
+S	prev:146612	cur:147304	sleep:308	len:320	c:80	r:603	ready:684
+
+write to tmp_lr_lookup/local_log_5000_340.txt
+5000 360
+sync 147646
+house.hand
+house.hand
+house.hand
+S	prev:147666	cur:148462	sleep:204	len:360	c:85	r:701	ready:787
+S	prev:148682	cur:149470	sleep:212	len:360	c:86	r:692	ready:780
+S	prev:149689	cur:150299	sleep:390	len:280	c:61	r:536	ready:598
+
+write to tmp_lr_lookup/local_log_5000_360.txt
+5000 380
+sync 150729
+house.hand
+house.hand
+house.hand
+S	prev:150748	cur:151585	sleep:163	len:380	c:90	r:739	ready:829
+S	prev:151763	cur:152596	sleep:167	len:380	c:96	r:726	ready:824
+S	prev:152770	cur:153291	sleep:479	len:240	c:59	r:452	ready:512
+
+write to tmp_lr_lookup/local_log_5000_380.txt
+5000 400
+sync 153797
+house.hand
+house.hand
+house.hand
+S	prev:153815	cur:154696	sleep:119	len:400	c:97	r:776	ready:873
+S	prev:154836	cur:155710	sleep:126	len:400	c:95	r:768	ready:866
+S	prev:155843	cur:156277	sleep:566	len:200	c:50	r:375	ready:426
+
+write to tmp_lr_lookup/local_log_5000_400.txt
