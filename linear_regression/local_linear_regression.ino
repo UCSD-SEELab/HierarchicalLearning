@@ -13,7 +13,9 @@
 #define FEATURE_NUM 12 // number of features, linear regression input
 #define CLASSES_NUM 18 // number of classes, linear regression output
 #define MAX_SAMPLE_RATE 400 // maximum sample rate
-#define LOOKUP
+#define HALF_LOOKUP_LENGTH 25 // half of lookup table's length
+#define LOOKUP_LENGTH 50 // lookup table is [0, 50]
+#define HALF_LOOKUP_RANGE 5 // half of the numerical range 
 
 #include "application.h"
 #include "MQTT.h"
@@ -71,40 +73,123 @@ unsigned long comp_start, comp_time; // to record the start and time of computat
 unsigned long read_start, read_time; // to record the start and time of reading
 unsigned long ready_time; // total time of computation and reading
 long sleep_time; // to store sleep time, should be signed
-// for look-up table
-#ifdef LOOKUP
-	#define HALF_LOOKUP_LENGTH 25
-	#define LOOKUP_LENGTH 50
-	#define HALF_LOOKUP_RANGE 5
-	const float RATIO = HALF_LOOKUP_LENGTH/HALF_LOOKUP_RANGE;
-	float lookup_table[LOOKUP_LENGTH+1];
 
-	/*
-	 * init_lookup_table
-	 */
-	void init_lookup_table() {
-		float e = 2.718281828;
-		for (uint8_t i = 0; i < LOOKUP_LENGTH+1; ++i) {
-			//i=0->e^(5) ~ i=LOOKUP_LENGTH->e^(-5)
-			float exp = (float)(-i)/RATIO+HALF_LOOKUP_RANGE;
-			lookup_table[i] = pow(e, exp);
-			// Serial.printf("%d %f %f\r\n", i, exp, lookup_table[i]); // print out for check
+/*************************************************************************
+ * lookup table settings and functions
+ ************************************************************************/
+const float RATIO = HALF_LOOKUP_LENGTH/HALF_LOOKUP_RANGE;
+float lookup_table[LOOKUP_LENGTH+1];
+
+/*
+ * init_lookup_table
+ */
+void init_lookup_table() {
+	float e = 2.718281828;
+	for (uint8_t i = 0; i < LOOKUP_LENGTH+1; ++i) {
+		//i=0->e^(5) ~ i=LOOKUP_LENGTH->e^(-5)
+		float exp = (float)(-i)/RATIO+HALF_LOOKUP_RANGE;
+		lookup_table[i] = pow(e, exp);
+		// Serial.printf("%d %f %f\r\n", i, exp, lookup_table[i]); // print out for check
+	}
+}
+
+/*
+ * sigmoid_lookup - use lookup table to calculate e^(-x)
+ */
+inline float sigmoid_lookup(float x) {
+	if (x > HALF_LOOKUP_RANGE) // X > 5, return 0
+		return 0;
+	if (-x > HALF_LOOKUP_RANGE) // x < -5, return e^(-5)
+		return lookup_table[LOOKUP_LENGTH];
+	uint8_t index = floor((-1)*(x-HALF_LOOKUP_RANGE)*RATIO);
+	return lookup_table[index];
+}
+
+/*
+ * sigmoid - return e^(-x)
+ * Could be replaced by a look-up table in the future
+ */
+inline float sigmoid(float x) {
+	float e = 2.718281828;
+	return pow(e, -x);
+}
+
+/*
+ * init_lr_parameter
+ */
+void init_lr_parameter(float para_array[FEATURE_NUM][CLASSES_NUM]) {
+	long randNum;
+	for (uint8_t i = 0; i < FEATURE_NUM; ++i)
+		for (uint8_t j = 0; j < CLASSES_NUM; ++j) {
+			randNum = random(0, MAX_RAND_NUM);
+			lr_para[i][j] = ((float)randNum) / MAX_RAND_NUM;
+			// Serial.printf("%f ", para_num[i][j]);
+		}
+}
+
+/*
+ * softmax_index, matrix multiply, return argmax-index
+ * Parameter - readLine: one line of data, its size is 1*features
+ *			   para_array: theta, its size is features*classes
+ *			   features, classes: size of matrixes
+ * Return - max_index: the index with the max value
+ */
+uint8_t softmax_index(float *readLine, float para_array[FEATURE_NUM][CLASSES_NUM], 
+	unsigned int features, unsigned int classes) {
+	float max_result = 0, tmpRes; // place to store temporary multiply and sum result
+	uint8_t max_index = 0;
+	for (uint8_t j = 0; j < classes; ++j) { // j is current class
+		tmpRes = 0; // clear result for each class
+		for (uint8_t k = 0; k < features; ++k) { // k is current feature
+			tmpRes += readLine[k] * lr_para[k][j];
+			// Serial.printf("%f %f %f\r\n", tmpRes, readLine[k], lr_para[k][j]);
+		}
+		tmpRes = sigmoid(tmpRes); // use lookup table here
+		// Serial.printf("tmpRes: %f\r\n", tmpRes);
+		if (tmpRes > max_result) {
+			max_result = tmpRes;
+			max_index = j;
 		}
 	}
+	return max_index;
+}
 
-	/*
-	 * sigmoid_lookup - use lookup table to calculate e^(-x)
-	 */
-	inline float sigmoid_lookup(float x) {
-		if (x > HALF_LOOKUP_RANGE) // X > 5, return 0
-			return 0;
-		if (-x > HALF_LOOKUP_RANGE) // x < -5, return e^(-5)
-			return lookup_table[LOOKUP_LENGTH];
-		uint8_t index = floor((-1)*(x-HALF_LOOKUP_RANGE)*RATIO);
-		return lookup_table[index];
+/*
+ * softmax, matrix multiply, return max index and softmax array
+ * Parameter - readLine: one line of data, its size is 1*features
+ *			   para_array: theta, its size is features*classes
+ *			   features, classes: size of matrixes
+ *			   softmax: returned softmax array, its size is 1*classes
+ * Return - max_index: the index with the max value
+ */
+uint8_t softmax_array(float *readLine, float para_array[FEATURE_NUM][CLASSES_NUM], 
+	unsigned int features, unsigned int classes, float *softmax) {
+	float max_result = 0, tmpRes; // place to store temporary multiply and sum result
+	uint8_t max_index = 0;
+	float sum = 0; // regularize for softmax regression
+	for (uint8_t j = 0; j < classes; ++j) { // j is current class
+		tmpRes = 0; // clear result for each class
+		for (uint8_t k = 0; k < features; ++k) { // k is current feature
+			tmpRes += readLine[k] * lr_para[k][j];
+			// Serial.printf("%f %f %f\r\n", tmpRes, readLine[k], lr_para[k][j]);
+		}
+		softmax[j] = tmpRes = sigmoid(tmpRes); // use lookup table here
+		// Serial.printf("%f\r\n", tmpRes);
+		if (tmpRes > max_result) {
+			max_result = tmpRes;
+			max_index = j;
+		}
+		sum += tmpRes;
 	}
-#endif
+	// each element divide by sum. regularize to 1.
+	for (uint8_t j = 0; j < classes; ++j)
+		softmax[j] /= sum;
+	return max_index;
+}
 
+/*************************************************************************
+ * Other settings for local connector
+ ************************************************************************/
 /*
  * Receive Message - Not used here
  */
@@ -197,87 +282,6 @@ uint8_t read_data_file(unsigned int cur_sample_rate) {
 	// open error!
 	Serial.println("error opening file");
 	return 1;
-}
-
-/*
- * sigmoid - return e^(-x)
- * Could be replaced by a look-up table in the future
- */
-inline float sigmoid(float x) {
-	float e = 2.718281828;
-	return pow(e, -x);
-}
-
-/*
- * init_lr_parameter
- */
-void init_lr_parameter(float para_array[FEATURE_NUM][CLASSES_NUM]) {
-	long randNum;
-	for (uint8_t i = 0; i < FEATURE_NUM; ++i)
-		for (uint8_t j = 0; j < CLASSES_NUM; ++j) {
-			randNum = random(0, MAX_RAND_NUM);
-			lr_para[i][j] = ((float)randNum) / MAX_RAND_NUM;
-			// Serial.printf("%f ", para_num[i][j]);
-		}
-}
-
-/*
- * softmax_index, matrix multiply, return argmax-index
- * Parameter - readLine: one line of data, its size is 1*features
- *			   para_array: theta, its size is features*classes
- *			   features, classes: size of matrixes
- * Return - max_index: the index with the max value
- */
-uint8_t softmax_index(float *readLine, float para_array[FEATURE_NUM][CLASSES_NUM], 
-	unsigned int features, unsigned int classes) {
-	float max_result = 0, tmpRes; // place to store temporary multiply and sum result
-	uint8_t max_index = 0;
-	for (uint8_t j = 0; j < classes; ++j) { // j is current class
-		tmpRes = 0; // clear result for each class
-		for (uint8_t k = 0; k < features; ++k) { // k is current feature
-			tmpRes += readLine[k] * lr_para[k][j];
-			// Serial.printf("%f %f %f\r\n", tmpRes, readLine[k], lr_para[k][j]);
-		}
-		tmpRes = sigmoid(tmpRes); // use lookup table here
-		// Serial.printf("tmpRes: %f\r\n", tmpRes);
-		if (tmpRes > max_result) {
-			max_result = tmpRes;
-			max_index = j;
-		}
-	}
-	return max_index;
-}
-
-/*
- * softmax, matrix multiply, return max index and softmax array
- * Parameter - readLine: one line of data, its size is 1*features
- *			   para_array: theta, its size is features*classes
- *			   features, classes: size of matrixes
- *			   softmax: returned softmax array, its size is 1*classes
- */
-uint8_t softmax_array(float *readLine, float para_array[FEATURE_NUM][CLASSES_NUM], 
-	unsigned int features, unsigned int classes, float *softmax) {
-	float max_result = 0, tmpRes; // place to store temporary multiply and sum result
-	uint8_t max_index = 0;
-	float sum = 0; // regularize for softmax regression
-	for (uint8_t j = 0; j < classes; ++j) { // j is current class
-		tmpRes = 0; // clear result for each class
-		for (uint8_t k = 0; k < features; ++k) { // k is current feature
-			tmpRes += readLine[k] * lr_para[k][j];
-			// Serial.printf("%f %f %f\r\n", tmpRes, readLine[k], lr_para[k][j]);
-		}
-		softmax[j] = tmpRes = sigmoid(tmpRes); // use lookup table here
-		// Serial.printf("%f\r\n", tmpRes);
-		if (tmpRes > max_result) {
-			max_result = tmpRes;
-			max_index = j;
-		}
-		sum += tmpRes;
-	}
-	// each element divide by sum. regularize to 1.
-	for (uint8_t j = 0; j < classes; ++j)
-		softmax[j] /= sum;
-	return max_index;
 }
 
 /*
