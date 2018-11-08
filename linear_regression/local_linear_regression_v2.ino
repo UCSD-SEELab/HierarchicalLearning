@@ -63,7 +63,7 @@ char write_buffer[MAX_INFO_LENGTH]; // to store the info sent to RPi
 
 // global array to store float data
 float lr_para[FEATURE_NUM][CLASSES_NUM]; // parameters for linear regression
-float readLine[FEATURE_NUM]; // to store a line
+float readLine[FEATURE_NUM], outputLine[CLASSES_NUM]; // to store a line
 uint8_t batch_data[MAX_SAMPLE_RATE+10]; // send batch
 unsigned int len_of_batch = 0; // len of send batch
 // global array to store assistant info
@@ -75,50 +75,13 @@ unsigned long ready_time; // total time of computation and reading
 long sleep_time; // to store sleep time, should be signed
 
 /*************************************************************************
- * lookup table settings and functions
+ * linear regression related code
  ************************************************************************/
-const float RATIO = HALF_LOOKUP_LENGTH/HALF_LOOKUP_RANGE;
-float lookup_table[LOOKUP_LENGTH+1];
-
-/*
- * init_lookup_table
- */
-void init_lookup_table() {
-	float e = 2.718281828;
-	for (uint8_t i = 0; i < LOOKUP_LENGTH+1; ++i) {
-		//i=0->e^(5) ~ i=LOOKUP_LENGTH->e^(-5)
-		float exp = (float)(-i)/RATIO+HALF_LOOKUP_RANGE;
-		lookup_table[i] = pow(e, exp);
-		// Serial.printf("%d %f %f\r\n", i, exp, lookup_table[i]); // print out for check
-	}
-}
-
-/*
- * sigmoid_lookup - use lookup table to calculate e^(-x)
- */
-inline float sigmoid_lookup(float x) {
-	if (x > HALF_LOOKUP_RANGE) // X > 5, return 0
-		return 0;
-	if (-x > HALF_LOOKUP_RANGE) // x < -5, return e^(-5)
-		return lookup_table[LOOKUP_LENGTH];
-	uint8_t index = floor((-1)*(x-HALF_LOOKUP_RANGE)*RATIO);
-	return lookup_table[index];
-}
-
-/*
- * sigmoid - return e^(-x)
- * Could be replaced by a look-up table in the future
- */
-inline float sigmoid(float x) {
-	float e = 2.718281828;
-	return pow(e, -x);
-}
-
 /*
  * init_lr_parameter
  */
-void init_lr_parameter(float para_array[FEATURE_NUM][CLASSES_NUM]) {
-	long randNum;
+void init_lr_parameter() {
+	unsigned long randNum;
 	for (uint8_t i = 0; i < FEATURE_NUM; ++i)
 		for (uint8_t j = 0; j < CLASSES_NUM; ++j) {
 			randNum = random(0, MAX_RAND_NUM);
@@ -128,63 +91,32 @@ void init_lr_parameter(float para_array[FEATURE_NUM][CLASSES_NUM]) {
 }
 
 /*
- * softmax_index, matrix multiply, return argmax-index
- * Parameter - readLine: one line of data, its size is 1*features
- *			   para_array: theta, its size is features*classes
- *			   features, classes: size of matrixes
- * Return - max_index: the index with the max value
+ * matrix_multiply: m1*m2=res
  */
-uint8_t softmax_index(float *readLine, float para_array[FEATURE_NUM][CLASSES_NUM], 
-	unsigned int features, unsigned int classes) {
-	float max_result = 0, tmpRes; // place to store temporary multiply and sum result
-	uint8_t max_index = 0;
-	for (uint8_t j = 0; j < classes; ++j) { // j is current class
-		tmpRes = 0; // clear result for each class
-		for (uint8_t k = 0; k < features; ++k) { // k is current feature
-			tmpRes += readLine[k] * lr_para[k][j];
-			// Serial.printf("%f %f %f\r\n", tmpRes, readLine[k], lr_para[k][j]);
-		}
-		tmpRes = sigmoid(tmpRes); // use lookup table here
-		// Serial.printf("tmpRes: %f\r\n", tmpRes);
-		if (tmpRes > max_result) {
-			max_result = tmpRes;
-			max_index = j;
-		}
+void vector_multiply(float (&m1)[FEATURE_NUM], float (&m2)[FEATURE_NUM][CLASSES_NUM],
+	float (&res)[CLASSES_NUM]) {
+	for (int i = 0; i < CLASSES_NUM; ++i) {
+		float tmp = 0;
+		for (int j = 0; j < FEATURE_NUM; ++j)
+			tmp += m1[j] * m2[j][i];
+		res[i] = tmp;
 	}
-	return max_index;
 }
 
 /*
- * softmax, matrix multiply, return max index and softmax array
- * Parameter - readLine: one line of data, its size is 1*features
- *			   para_array: theta, its size is features*classes
- *			   features, classes: size of matrixes
- *			   softmax: returned softmax array, its size is 1*classes
- * Return - max_index: the index with the max value
+ * pack: pack out to batch_data
  */
-uint8_t softmax_array(float *readLine, float para_array[FEATURE_NUM][CLASSES_NUM], 
-	unsigned int features, unsigned int classes, float *softmax) {
-	float max_result = 0, tmpRes; // place to store temporary multiply and sum result
+void pack(float *out, int class_num) {
+	float max = 0;
 	uint8_t max_index = 0;
-	float sum = 0; // regularize for softmax regression
-	for (uint8_t j = 0; j < classes; ++j) { // j is current class
-		tmpRes = 0; // clear result for each class
-		for (uint8_t k = 0; k < features; ++k) { // k is current feature
-			tmpRes += readLine[k] * lr_para[k][j];
-			// Serial.printf("%f %f %f\r\n", tmpRes, readLine[k], lr_para[k][j]);
+	// go through the out array and find out argmax-index
+	for (int i = 0; i < class_num; ++i) {
+		if (out[i] > max) {
+			max = out[i];
+			max_index = i;
 		}
-		softmax[j] = tmpRes = sigmoid(tmpRes); // use lookup table here
-		// Serial.printf("%f\r\n", tmpRes);
-		if (tmpRes > max_result) {
-			max_result = tmpRes;
-			max_index = j;
-		}
-		sum += tmpRes;
 	}
-	// each element divide by sum. regularize to 1.
-	for (uint8_t j = 0; j < classes; ++j)
-		softmax[j] /= sum;
-	return max_index;
+	batch_data[len_of_batch++] = max_index;
 }
 
 /*************************************************************************
@@ -215,7 +147,7 @@ void init_card() {
  * Parameter - Line: a line to store the floats
  *			 - readcnt: number of floats to read from this line
  */
-void read_line(float *Line, unsigned int readcnt) {
+void read_line(float *Line, int readcnt) {
 	String readString = ""; // clear string
 	// read FEATURE_NUM float from one line, note readcnt should less than max-of-uint16_t
 	for (int i = 0; i < readcnt && myFile.available(); ++i) {
@@ -250,7 +182,7 @@ void read_line(float *Line, unsigned int readcnt) {
  *			1 meet end of file (EOF)
  * Set sample_num! A global variable
  */
-uint8_t read_data_file(unsigned int cur_sample_rate) {
+uint8_t read_data_file(int cur_sample_rate) {
 	myFile = SD.open(filename); // open the file
 	myFile.seek(position); // locate the last time of reading
 	if (myFile) {
@@ -262,9 +194,10 @@ uint8_t read_data_file(unsigned int cur_sample_rate) {
 			comp_start = millis();
 			read_time += comp_start - read_start; // cumulative add
 			// compute argmax-index data for this line
-			uint8_t max_index = softmax_index(readLine, lr_para, FEATURE_NUM, CLASSES_NUM);
+			vector_multiply(readLine, lr_para, outputLine);
 			// pack the result into send batch
-			batch_data[len_of_batch++] = max_index;
+			pack(outputLine, CLASSES_NUM);
+			//pack(readLine, FEATURE_NUM);
 			comp_time += millis() - comp_start; // cumulative add
 		}
 		
@@ -330,8 +263,7 @@ void send_sleep_time() {
 void setup() {
 	Serial.begin(115200);
 	init_card(); // init sd card
-	init_lr_parameter(lr_para); // init linear regression parameters
-	init_lookup_table();
+	init_lr_parameter(); // init linear regression parameters
 
 	// connect to the RPi
 	// client_id, user, passwd, willTopic, willQoS, willRetain, willMessage, cleanSession, version?
