@@ -16,14 +16,14 @@
 #define MAX_INFO_LENGTH 100 // maximum length of sending info, e.g. bw and sample rate
 #define MAX_RAND_NUM 1000000 // maximum number in random()
 #define MAX_SAMPLE_RATE 400 // maximum sample rate
-#define SEND_INTERVAL 2000 // the interval in ms of each iteration
+#define SEND_INTERVAL 3000 // the interval in ms of each iteration
 #define FEATURE_NUM 12 // number of features, linear regression input
 #define CLASSES_NUM 18 // number of classes, linear regression output
 // size of neural network
 #define N_IN FEATURE_NUM // nodes as input
 #define N_OUT CLASSES_NUM // nodes as output
-#define N_1 70 // nodes in the first layer
-#define N_2 70 // nodes in the second layer
+#define N_1 10 // nodes in the first layer
+#define N_2 10 // nodes in the second layer
 #define BATCH_LEN 1 // the number of input samples for one time
 
 // const variables in experiments
@@ -207,32 +207,33 @@ void init_card() {
 
 
 /*
- * read_line - read the first readcnt floats in a line from myFile
- * Parameter - Line: a line to store the floats
- *			 - readcnt: number of floats to read from this line
+ * read_matrix
+ * Parameter - in: the matrix to store read values
  */
-void read_line(float *Line, int readcnt) {
+void read_matrix(float (&in)[N_IN][BATCH_LEN]) {
 	String readString = ""; // clear string
-	// read FEATURE_NUM float from one line, note readcnt should less than max-of-uint16_t
-	for (int i = 0; i < readcnt && myFile.available(); ++i) {
-		// read until finish reading one float
-		char byte = myFile.read();
-		while (byte != ' ' && byte != '\n') {
-			readString += byte;
-			byte = myFile.read();
+	for (int i = 0; i < BATCH_LEN && myFile.available(); ++i) {
+		// read FEATURE_NUM float from one line
+		for (int j = 0; j < N_IN && myFile.available(); ++j) {
+			// read until finish reading one float
+			char byte = myFile.read();
+			while (byte != ' ' && byte != '\n') {
+				readString += byte;
+				byte = myFile.read();
+			}
+			if (byte == '\n') // accidentally meet the end of line, return
+				return;
+			// finish reading one float, convert it
+			float readFloat = readString.toFloat();
+			in[j][i] = readFloat; // add the float to readLine
+			readString = ""; // clear inString
 		}
-		if (byte == '\n') // accidentally meet the end of line, return
-			return;
-		// finish reading one float, convert it
-		float readFloat = readString.toFloat();
-		Line[i] = readFloat; // add the float to readLine
-		readString = ""; // clear inString
-	}
-	// if read until end of line, move on
-	while (myFile.available()) {
-		char byte = myFile.read();
-		if (byte == '\n')
-			break;
+		// read until end of this line, move on
+		while (myFile.available()) {
+			char byte = myFile.read();
+			if (byte == '\n')
+				break;
+		}
 	}
 	return;
 }
@@ -250,22 +251,22 @@ uint8_t read_data_file(int cur_sample_rate) {
 	myFile = SD.open(filename); // open the file
 	myFile.seek(position); // locate the last time of reading
 	if (myFile) {
-		// read sample_rate lines from myFile, note cur_sample_rate should be less than max-of-uint16_t
-		for (int i = 0; i < cur_sample_rate && myFile.available(); ++i) {
-			read_start = millis();
-			// read FEATURE floats in one line and store them in readLine
-			read_line(readLine, FEATURE_NUM);
-			// copy readLine to nn_in, there is only one line here
-			for (int j = 0; j < FEATURE_NUM; ++j)
-				nn_in[j][0] = readLine[j];
+		// read sample_rate lines from myFile
+		for (int i = 0; i < cur_sample_rate && myFile.available(); i+=BATCH_LEN) {
+			// read and process BATCH_LEN lines each time 
+			for (int j = 0; j < BATCH_LEN && myFile.available(); ++j) {
+				read_start = millis();
+				// read N_IN*BATCH_LEN floats and store them in nn_in
+				read_matrix(nn_in);
 
-			comp_start = millis();
-			read_time += comp_start - read_start; // cumulative add
-			// compute argmax-index data for this line
-			nn(nn_in, nn_out);
-			// pack the result into send batch
-			pack(nn_out);
-			comp_time += millis() - comp_start; // cumulative add
+				comp_start = millis();
+				read_time += comp_start - read_start; // cumulative add
+				// compute argmax-index data for this line
+				nn(nn_in, nn_out);
+				// pack the result into send batch
+				pack(nn_out);
+				comp_time += millis() - comp_start; // cumulative add
+			}
 		}
 		
 		// update position
