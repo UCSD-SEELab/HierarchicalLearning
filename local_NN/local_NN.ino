@@ -10,20 +10,20 @@
 #include "application.h"
 #include "MQTT.h"
 #include "sd-card-library-photon-compat.h"
-#include "math.h"
 
 #define NUM_OF_SR 11 // number of sameple rate choices
 #define NUM_OF_BW 3 // number of bandwidth choices
 #define MAX_INFO_LENGTH 100 // maximum length of sending info, e.g. bw and sample rate
 #define MAX_RAND_NUM 1000000 // maximum number in random()
 #define MAX_SAMPLE_RATE 400 // maximum sample rate
+#define SEND_INTERVAL 2000 // the interval in ms of each iteration
 #define FEATURE_NUM 12 // number of features, linear regression input
 #define CLASSES_NUM 18 // number of classes, linear regression output
 // size of neural network
 #define N_IN FEATURE_NUM // nodes as input
 #define N_OUT CLASSES_NUM // nodes as output
-#define N_1 10 // nodes in the first layer
-#define N_2 10 // nodes in the second layer
+#define N_1 70 // nodes in the first layer
+#define N_2 70 // nodes in the second layer
 #define BATCH_LEN 1 // the number of input samples for one time
 
 // const variables in experiments
@@ -87,7 +87,7 @@ long sleep_time; // to store sleep time, should be signed
  * init_weights
  */
 void init_nn_weights() {
-	unsigned long randNum;
+	long randNum;
 	for (int i = 0; i < N_1; ++i)
 		for (int j = 0; j < N_IN; ++j) {
 			randNum = random(0, MAX_RAND_NUM);
@@ -108,18 +108,18 @@ void init_nn_weights() {
 /*
  * ReLU activation
  */
-inline void ReLU(float **x, int row, int col) {
+inline void ReLU(float *x, int row, int col) {
 	for (int i = 0; i < row; ++i)
 		for (int j = 0; j < col; ++j)
-			x[i][j] > 0? 1: x[i][j] = 0; // do nothing or make it zero
+			*(x+i*col+j) > 0? 1: *(x+i*col+j) = 0; // do nothing or make it zero
 }
 
 /*
  * matrix_multiply: m1*m2=res
  */
-void matrix_multiply(float **m1, int row_m1, int col_m1, 
-	float **m2, int row_m2, int col_m2, 
-	float **res, int row_res, int col_res) {
+void matrix_multiply(float *m1, int row_m1, int col_m1, 
+	float *m2, int row_m2, int col_m2, 
+	float *res, int row_res, int col_res) {
 	// check whether the number of rows and cols meet the requirement
 	if (col_m1 != row_m2 || row_m1 != row_res || col_m2 != col_res)
 		return;
@@ -127,8 +127,8 @@ void matrix_multiply(float **m1, int row_m1, int col_m1,
 		for (int j = 0; j < col_res; ++j) {
 			float tmp = 0;
 			for (int k = 0; k < col_m1; ++k)
-				tmp += m1[i][k] * m2[k][j];
-			res[i][j] = tmp;
+				tmp += *(m1+i*col_m1+k) * *(m2+k*col_m2+j);
+			*(res+i*col_res+j) = tmp;
 		}
 }
 
@@ -136,54 +136,49 @@ void matrix_multiply(float **m1, int row_m1, int col_m1,
  * nn: in -> nn -> out
  * "in" is feature_num * batch_num, "out" is classnum*batch_num
  */
-void nn(float **in, int feature_num, int batch_num,
-	float **out, int class_num) {
-	matrix_multiply((float **)nn_w1, N_1, N_IN,
-					in, feature_num, batch_num,
-					(float **)nn_l1, N_1, BATCH_LEN);
-	print_matrix((float **)nn_l1, N_1, BATCH_LEN);
-	ReLU((float **)nn_l1, N_1, BATCH_LEN);
-	print_matrix((float **)nn_l1, N_1, BATCH_LEN);
-	matrix_multiply((float **)nn_w2, N_2, N_1,
-					(float **)nn_l1, N_1, BATCH_LEN,
-					(float **)nn_l2, N_2, BATCH_LEN);
-	print_matrix((float **)nn_l2, N_2, BATCH_LEN);
-	ReLU((float **)nn_l2, N_2, BATCH_LEN);
-	print_matrix((float **)nn_l1, N_1, BATCH_LEN);
-	matrix_multiply((float **)nn_w3, N_OUT, N_2,
-					(float **)nn_l2, N_2, BATCH_LEN,
-					out, class_num, batch_num);
-	print_matrix(out, class_num, batch_num);
-	ReLU(out, class_num, batch_num);
-	print_matrix(out, class_num, batch_num);
+void nn(float (&in)[N_IN][BATCH_LEN], float (&out)[N_OUT][BATCH_LEN]) {
+	matrix_multiply((float *)nn_w1, N_1, N_IN,
+					(float *)in, N_IN, BATCH_LEN,
+					(float *)nn_l1, N_1, BATCH_LEN);
+	ReLU((float *)nn_l1, N_1, BATCH_LEN);
+
+	matrix_multiply((float *)nn_w2, N_2, N_1,
+					(float *)nn_l1, N_1, BATCH_LEN,
+					(float *)nn_l2, N_2, BATCH_LEN);
+	ReLU((float *)nn_l2, N_2, BATCH_LEN);
+
+	matrix_multiply((float *)nn_w3, N_OUT, N_2,
+					(float *)nn_l2, N_2, BATCH_LEN,
+					(float *)out, N_OUT, BATCH_LEN);
+	ReLU((float *)out, N_OUT, BATCH_LEN);
 }
 
 /*
  * pack: pack out to batch_data
  */
-void pack(float **out, int class_num, int batch_num) {
-	for (int j = 0; j < batch_num; ++j) {
+void pack(float (&out)[N_OUT][BATCH_LEN]) {
+	for (int j = 0; j < BATCH_LEN; ++j) {
 		float max = 0;
 		uint8_t max_index = 0;
 		// go through the out array and find out argmax-index
-		for (int i = 0; i < class_num; ++i) {
+		for (int i = 0; i < N_OUT; ++i) {
 			if (out[i][j] > max) {
 				max = out[i][j];
 				max_index = i;
 			}
 		}
 		batch_data[len_of_batch++] = max_index;
+		// Serial.printf("max index is %d\r\n", max_index);
 	}
 }
 
 /*
  * print_matrix
  */
-inline void print_matrix(float **m, int row, int col) {
-	Serial.println("matrix:");
+inline void print_matrix(float *m, int row, int col) {
 	for (int i = 0; i < row; ++i) {
 		for (int j = 0; j < col; ++j)
-			Serial.printf("%f ", m[i][j]);
+			Serial.printf("%f ", *(m+i*col+j));
 		Serial.printf("\r\n");
 	}
 }
@@ -263,14 +258,13 @@ uint8_t read_data_file(int cur_sample_rate) {
 			// copy readLine to nn_in, there is only one line here
 			for (int j = 0; j < FEATURE_NUM; ++j)
 				nn_in[j][0] = readLine[j];
-			print_matrix((float **)nn_in, N_IN, BATCH_LEN);
 
 			comp_start = millis();
 			read_time += comp_start - read_start; // cumulative add
 			// compute argmax-index data for this line
-			nn((float **)nn_in, FEATURE_NUM, BATCH_LEN, (float **)nn_out, CLASSES_NUM);
+			nn(nn_in, nn_out);
 			// pack the result into send batch
-			pack((float **)nn_out, CLASSES_NUM, BATCH_LEN);
+			pack(nn_out);
 			comp_time += millis() - comp_start; // cumulative add
 		}
 		
@@ -386,7 +380,7 @@ void setup() {
 				
 				cur_time = millis();
 				// Serial.printf("cur_time %ld\r\n", cur_time);
-				sleep_time = 1000 - (cur_time - prev_time);
+				sleep_time = SEND_INTERVAL - (cur_time - prev_time);
 				if (sleep_time > 0) {
 					delay(sleep_time); // delay sleep_time milliseconds
 					sprintf(write_buffer, "S\tprev:%ld\tcur:%ld\tsleep:%ld\tlen:%d\tc:%ld\tr:%ld\tready:%ld\r\n", 

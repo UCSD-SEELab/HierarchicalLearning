@@ -81,11 +81,11 @@ long sleep_time; // to store sleep time, should be signed
  * init_lr_parameter
  */
 void init_lr_parameter() {
-	unsigned long randNum;
+	long randNum;
 	for (uint8_t i = 0; i < FEATURE_NUM; ++i)
 		for (uint8_t j = 0; j < CLASSES_NUM; ++j) {
 			randNum = random(0, MAX_RAND_NUM);
-			lr_para[i][j] = ((float)randNum) / MAX_RAND_NUM;
+			lr_para[i][j] = ((float)(randNum - MAX_RAND_NUM)) / MAX_RAND_NUM;
 			// Serial.printf("%f ", para_num[i][j]);
 		}
 }
