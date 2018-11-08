@@ -16,7 +16,7 @@
 #define MAX_INFO_LENGTH 100 // maximum length of sending info, e.g. bw and sample rate
 #define MAX_RAND_NUM 1000000 // maximum number in random()
 #define MAX_SAMPLE_RATE 400 // maximum sample rate
-#define SEND_INTERVAL 3000 // the interval in ms of each iteration
+#define SEND_INTERVAL 1000 // the interval in ms of each iteration
 #define FEATURE_NUM 12 // number of features, linear regression input
 #define CLASSES_NUM 18 // number of classes, linear regression output
 // size of neural network
@@ -24,7 +24,7 @@
 #define N_OUT CLASSES_NUM // nodes as output
 #define N_1 10 // nodes in the first layer
 #define N_2 10 // nodes in the second layer
-#define BATCH_LEN 1 // the number of input samples for one time
+#define BATCH_LEN 5 // the number of input samples for one time
 
 // const variables in experiments
 const int sample_rate[] = {200, 220, 240, 260, 280, 300, 320, 340, 360, 380, 400};
@@ -66,10 +66,9 @@ char write_buffer[MAX_INFO_LENGTH]; // to store the info sent to RPi
 // const char boostname[] = "nn.txt";
 
 // nodes for neural networks
-float nn_in[N_IN][BATCH_LEN], nn_out[N_OUT][BATCH_LEN]; // input and output nodes
-float nn_l1[N_1][BATCH_LEN], nn_l2[N_2][BATCH_LEN]; // middle layer nodes in nn
-float nn_w1[N_1][N_IN], nn_w2[N_2][N_1], nn_w3[N_OUT][N_2]; // weights between layers
-float readLine[FEATURE_NUM]; // to store a line read from file
+float nn_in[BATCH_LEN][N_IN], nn_out[BATCH_LEN][N_OUT]; // input and output nodes
+float nn_l1[BATCH_LEN][N_1], nn_l2[BATCH_LEN][N_2]; // middle layer nodes in nn
+float nn_w1[N_IN][N_1], nn_w2[N_1][N_2], nn_w3[N_2][N_OUT]; // weights between layers
 uint8_t batch_data[MAX_SAMPLE_RATE+10]; // send batch
 unsigned int len_of_batch = 0; // len of send batch
 // global array to store assistant info
@@ -88,18 +87,18 @@ long sleep_time; // to store sleep time, should be signed
  */
 void init_nn_weights() {
 	long randNum;
-	for (int i = 0; i < N_1; ++i)
-		for (int j = 0; j < N_IN; ++j) {
+	for (int i = 0; i < N_IN; ++i)
+		for (int j = 0; j < N_1; ++j) {
 			randNum = random(0, MAX_RAND_NUM);
 			nn_w1[i][j] = ((float)randNum) / MAX_RAND_NUM;
 		}
-	for (int i = 0; i < N_2; ++i)
-		for (int j = 0; j < N_1; ++j) {
+	for (int i = 0; i < N_1; ++i)
+		for (int j = 0; j < N_2; ++j) {
 			randNum = random(0, MAX_RAND_NUM);
 			nn_w2[i][j] = ((float)randNum) / MAX_RAND_NUM;
 		}
-	for (int i = 0; i < N_OUT; ++i)
-		for (int j = 0; j < N_2; ++j) {
+	for (int i = 0; i < N_2; ++i)
+		for (int j = 0; j < N_OUT; ++j) {
 			randNum = random(0, MAX_RAND_NUM);
 			nn_w3[i][j] = ((float)randNum) / MAX_RAND_NUM;
 		}
@@ -109,9 +108,11 @@ void init_nn_weights() {
  * ReLU activation
  */
 inline void ReLU(float *x, int row, int col) {
-	for (int i = 0; i < row; ++i)
+	for (int i = 0; i < row; ++i) {
+		float *line = x + i * col; // record to save energy
 		for (int j = 0; j < col; ++j)
-			*(x+i*col+j) > 0? 1: *(x+i*col+j) = 0; // do nothing or make it zero
+			*(line + j) > 0? 1: *(line + j) = 0; // do nothing or make it zero
+	}
 }
 
 /*
@@ -123,52 +124,63 @@ void matrix_multiply(float *m1, int row_m1, int col_m1,
 	// check whether the number of rows and cols meet the requirement
 	if (col_m1 != row_m2 || row_m1 != row_res || col_m2 != col_res)
 		return;
-	for (int i = 0; i < row_res; ++i)
+	for (int i = 0; i < row_res; ++i) {
+		// record the start pointer of i_th line in m1 and res, save energy
+		float *line_m1 = m1 + i * col_m1;
+		float *line_res = res + i * col_res;
 		for (int j = 0; j < col_res; ++j) {
 			float tmp = 0;
+			// record the start pointer of j_th column in m2, save energy
+			float *column_m2 = m2 + j;
 			for (int k = 0; k < col_m1; ++k)
-				tmp += *(m1+i*col_m1+k) * *(m2+k*col_m2+j);
-			*(res+i*col_res+j) = tmp;
+				tmp += *(line_m1 + k) * *(column_m2 + k * col_m2);
+			*(line_res + j) = tmp; // set the value
 		}
+	}
 }
 
 /*
  * nn: in -> nn -> out
  * "in" is feature_num * batch_num, "out" is classnum*batch_num
  */
-void nn(float (&in)[N_IN][BATCH_LEN], float (&out)[N_OUT][BATCH_LEN]) {
-	matrix_multiply((float *)nn_w1, N_1, N_IN,
-					(float *)in, N_IN, BATCH_LEN,
-					(float *)nn_l1, N_1, BATCH_LEN);
-	ReLU((float *)nn_l1, N_1, BATCH_LEN);
+void nn(float *in, int in_row, int in_col,
+	    float *out, int out_row, int out_col) {
+	// check whether the rows of input and output equal
+	if (in_row != out_row || in_col != N_IN || out_col != N_OUT)
+		return;
+	matrix_multiply(in, in_row, in_col,
+					(float *)nn_w1, N_IN, N_1,
+					(float *)nn_l1, in_row, N_1);
+	ReLU((float *)nn_l1, in_row, N_1);
 
-	matrix_multiply((float *)nn_w2, N_2, N_1,
-					(float *)nn_l1, N_1, BATCH_LEN,
-					(float *)nn_l2, N_2, BATCH_LEN);
-	ReLU((float *)nn_l2, N_2, BATCH_LEN);
+	matrix_multiply((float *)nn_l1, in_row, N_1,
+					(float *)nn_w2, N_1, N_2,
+					(float *)nn_l2, in_row, N_2);
+	ReLU((float *)nn_l2, in_row, N_2);
 
-	matrix_multiply((float *)nn_w3, N_OUT, N_2,
-					(float *)nn_l2, N_2, BATCH_LEN,
-					(float *)out, N_OUT, BATCH_LEN);
-	ReLU((float *)out, N_OUT, BATCH_LEN);
+	matrix_multiply((float *)nn_l2, in_row, N_2,
+					(float *)nn_w3, N_2, N_OUT,
+					out, out_row, out_col);
+	ReLU(out, out_row, out_col);
 }
 
 /*
  * pack: pack out to batch_data
  */
-void pack(float (&out)[N_OUT][BATCH_LEN]) {
-	for (int j = 0; j < BATCH_LEN; ++j) {
+void pack(float *out, int out_row, int out_col) {
+	for (int i = 0; i < out_row; ++i) {
 		float max = 0;
 		uint8_t max_index = 0;
+		float *line = out + i * out_col; // record to save energy
 		// go through the out array and find out argmax-index
-		for (int i = 0; i < N_OUT; ++i) {
-			if (out[i][j] > max) {
-				max = out[i][j];
-				max_index = i;
+		for (int j = 0; j < out_col; ++j) {
+			if (*(line + j) > max) {
+				max = *(line + j);
+				max_index = j;
 			}
 		}
 		batch_data[len_of_batch++] = max_index;
-		// Serial.printf("max index is %d\r\n", max_index);
+		// Serial.printf("max index is %d (%d)\r\n", max_index, len_of_batch);
 	}
 }
 
@@ -181,6 +193,7 @@ inline void print_matrix(float *m, int row, int col) {
 			Serial.printf("%f ", *(m+i*col+j));
 		Serial.printf("\r\n");
 	}
+	Serial.printf("\r\n");
 }
 
 /*************************************************************************
@@ -208,13 +221,15 @@ void init_card() {
 
 /*
  * read_matrix
- * Parameter - in: the matrix to store read values
+ * Parameter - in: the matrix to store read values, size is in_row*in_col
  */
-void read_matrix(float (&in)[N_IN][BATCH_LEN]) {
+void read_matrix(float *in, int in_row, int in_col) {
 	String readString = ""; // clear string
-	for (int i = 0; i < BATCH_LEN && myFile.available(); ++i) {
+	for (int i = 0; i < in_row && myFile.available(); ++i) {
+		// record the start pointer of i_th line, save energy
+		float *line = in + i * in_col;
 		// read FEATURE_NUM float from one line
-		for (int j = 0; j < N_IN && myFile.available(); ++j) {
+		for (int j = 0; j < in_col && myFile.available(); ++j) {
 			// read until finish reading one float
 			char byte = myFile.read();
 			while (byte != ' ' && byte != '\n') {
@@ -225,7 +240,7 @@ void read_matrix(float (&in)[N_IN][BATCH_LEN]) {
 				return;
 			// finish reading one float, convert it
 			float readFloat = readString.toFloat();
-			in[j][i] = readFloat; // add the float to readLine
+			*(line+j) = readFloat; // add the float to readLine
 			readString = ""; // clear inString
 		}
 		// read until end of this line, move on
@@ -254,19 +269,18 @@ uint8_t read_data_file(int cur_sample_rate) {
 		// read sample_rate lines from myFile
 		for (int i = 0; i < cur_sample_rate && myFile.available(); i+=BATCH_LEN) {
 			// read and process BATCH_LEN lines each time 
-			for (int j = 0; j < BATCH_LEN && myFile.available(); ++j) {
-				read_start = millis();
-				// read N_IN*BATCH_LEN floats and store them in nn_in
-				read_matrix(nn_in);
+			read_start = millis();
+			// calculate the len of this batch, less than BATCH_LEN if exceeds cur_sample_rate
+			int len = min(cur_sample_rate - i, BATCH_LEN);
+			read_matrix((float *)nn_in, len, N_IN);
 
-				comp_start = millis();
-				read_time += comp_start - read_start; // cumulative add
-				// compute argmax-index data for this line
-				nn(nn_in, nn_out);
-				// pack the result into send batch
-				pack(nn_out);
-				comp_time += millis() - comp_start; // cumulative add
-			}
+			comp_start = millis();
+			read_time += comp_start - read_start; // cumulative add
+			// compute argmax-index data for this line
+			nn((float *)nn_in, len, N_IN, (float *)nn_out, len, N_OUT);
+			// pack the result into send batch
+			pack((float *)nn_out, len, N_OUT);
+			comp_time += millis() - comp_start; // cumulative add
 		}
 		
 		// update position
