@@ -4,26 +4,26 @@
  * Suppose necessary files are alreay written on the SD card:
  *     data.txt (extracted_subject1.txt)
  * Author: Xiaofan Yu
- * Date: 11/2/2018
+ * Date: 11/7/2018
  */
 // put it here to avoid "was not declared error"
 #include "application.h"
 #include "MQTT.h"
 #include "sd-card-library-photon-compat.h"
-#include "math.h"
 
 #define NUM_OF_SR 11 // number of sameple rate choices
 #define NUM_OF_BW 3 // number of bandwidth choices
 #define MAX_INFO_LENGTH 100 // maximum length of sending info, e.g. bw and sample rate
 #define MAX_RAND_NUM 1000000 // maximum number in random()
 #define MAX_SAMPLE_RATE 400 // maximum sample rate
+#define SEND_INTERVAL 1000 // the interval in ms of each iteration
 #define FEATURE_NUM 12 // number of features, linear regression input
 #define CLASSES_NUM 18 // number of classes, linear regression output
 // size of neural network
 #define N_IN FEATURE_NUM // nodes as input
 #define N_OUT CLASSES_NUM // nodes as output
-#define N_1 10 // nodes in the first layer
-#define N_2 10 // nodes in the second layer
+#define N_1 90 // nodes in the first layer
+#define N_2 90 // nodes in the second layer
 #define BATCH_LEN 1 // the number of input samples for one time
 
 // const variables in experiments
@@ -37,8 +37,6 @@ const char parameter_topic[] = "parameter"; // for sending bandwidth and sample 
 const char sync_topic[] = "sync"; // for sync, send current time
 
 /* global variables for MQTT */
-void callback(char* topic, byte* payload, unsigned int length);
-
 byte server[] = { 137,110,160,230 }; // specify the ip address of RPi
 MQTT client(server, 1883, 60, callback, MAX_SAMPLE_RATE+10); // ip, port, keepalive, callback, maxpacketsize=
 
@@ -66,10 +64,9 @@ char write_buffer[MAX_INFO_LENGTH]; // to store the info sent to RPi
 // const char boostname[] = "nn.txt";
 
 // nodes for neural networks
-float nn_in[N_IN][BATCH_LEN], nn_out[N_OUT][BATCH_LEN]; // input and output nodes
-float nn_l1[N_1][BATCH_LEN], nn_l2[N_2][BATCH_LEN]; // middle layer nodes in nn
-float nn_w1[N_1][N_IN], nn_w2[N_2][N_1], nn_w3[N_OUT][N_2]; // weights between layers
-float readLine[FEATURE_NUM]; // to store a line read from file
+float nn_in[BATCH_LEN][N_IN], nn_out[BATCH_LEN][N_OUT]; // input and output nodes
+float nn_l1[BATCH_LEN][N_1], nn_l2[BATCH_LEN][N_2]; // middle layer nodes in nn
+float nn_w1[N_IN][N_1], nn_w2[N_1][N_2], nn_w3[N_2][N_OUT]; // weights between layers
 uint8_t batch_data[MAX_SAMPLE_RATE+10]; // send batch
 unsigned int len_of_batch = 0; // len of send batch
 // global array to store assistant info
@@ -78,6 +75,8 @@ unsigned long prev_time, cur_time; // to store measured time
 unsigned long comp_start, comp_time; // to record the start and time of computation
 unsigned long read_start, read_time; // to record the start and time of reading
 unsigned long ready_time; // total time of computation and reading
+unsigned long total_comp_t, total_read_t; // to record the total time for calculating avg
+unsigned int send_num = 0; // the number of times it sends
 long sleep_time; // to store sleep time, should be signed
 
 /*************************************************************************
@@ -87,106 +86,119 @@ long sleep_time; // to store sleep time, should be signed
  * init_weights
  */
 void init_nn_weights() {
-	unsigned long randNum;
-	for (int i = 0; i < N_1; ++i)
-		for (int j = 0; j < N_IN; ++j) {
+	long randNum;
+	for (int i = 0; i < N_IN; ++i)
+		for (int j = 0; j < N_1; ++j) {
 			randNum = random(0, MAX_RAND_NUM);
 			nn_w1[i][j] = ((float)randNum) / MAX_RAND_NUM;
 		}
-	for (int i = 0; i < N_2; ++i)
-		for (int j = 0; j < N_1; ++j) {
+	for (int i = 0; i < N_1; ++i)
+		for (int j = 0; j < N_2; ++j) {
 			randNum = random(0, MAX_RAND_NUM);
 			nn_w2[i][j] = ((float)randNum) / MAX_RAND_NUM;
 		}
-	for (int i = 0; i < N_OUT; ++i)
-		for (int j = 0; j < N_2; ++j) {
+	for (int i = 0; i < N_2; ++i)
+		for (int j = 0; j < N_OUT; ++j) {
 			randNum = random(0, MAX_RAND_NUM);
 			nn_w3[i][j] = ((float)randNum) / MAX_RAND_NUM;
 		}
 }
 
 /*
- * ReLU activation
+ * ReLU activation. Read continuously!
  */
-inline void ReLU(float **x, int row, int col) {
-	for (int i = 0; i < row; ++i)
+inline void ReLU(float *x, int row, int col) {
+	for (int i = 0; i < row; ++i) {
+		float *line = x + i * col; // record to save energy
 		for (int j = 0; j < col; ++j)
-			x[i][j] > 0? 1: x[i][j] = 0; // do nothing or make it zero
+			*(line + j) > 0? 1: *(line + j) = 0; // do nothing or make it zero
+	}
 }
 
 /*
- * matrix_multiply: m1*m2=res
+ * matrix_multiply: m1*m2=res.
  */
-void matrix_multiply(float **m1, int row_m1, int col_m1, 
-	float **m2, int row_m2, int col_m2, 
-	float **res, int row_res, int col_res) {
+void matrix_multiply(float *m1, int row_m1, int col_m1, 
+	float *m2, int row_m2, int col_m2, 
+	float *res, int row_res, int col_res) {
 	// check whether the number of rows and cols meet the requirement
 	if (col_m1 != row_m2 || row_m1 != row_res || col_m2 != col_res)
 		return;
-	for (int i = 0; i < row_res; ++i)
+	for (int i = 0; i < row_res; ++i) {
+		// record the start pointer of i_th line in m1 and res
+		float *line_m1 = m1 + i * col_m1;
+		float *line_res = res + i * col_res;
 		for (int j = 0; j < col_res; ++j) {
 			float tmp = 0;
-			for (int k = 0; k < col_m1; ++k)
-				tmp += m1[i][k] * m2[k][j];
-			res[i][j] = tmp;
+			// record the start pointer of j_th column in m2, save energy
+			float *column_m2 = m2 + j;
+			for (int k = 0; k < col_m1; ++k) {
+				// tmp += *(line_m1 + k) * *(column_m2 + k * col_m2);
+				tmp += *(line_m1++) * *column_m2;
+				column_m2 += col_m2;
+			}
+			*(line_res++) = tmp; // set the value
 		}
+	}
 }
 
 /*
  * nn: in -> nn -> out
  * "in" is feature_num * batch_num, "out" is classnum*batch_num
  */
-void nn(float **in, int feature_num, int batch_num,
-	float **out, int class_num) {
-	matrix_multiply((float **)nn_w1, N_1, N_IN,
-					in, feature_num, batch_num,
-					(float **)nn_l1, N_1, BATCH_LEN);
-	print_matrix((float **)nn_l1, N_1, BATCH_LEN);
-	ReLU((float **)nn_l1, N_1, BATCH_LEN);
-	print_matrix((float **)nn_l1, N_1, BATCH_LEN);
-	matrix_multiply((float **)nn_w2, N_2, N_1,
-					(float **)nn_l1, N_1, BATCH_LEN,
-					(float **)nn_l2, N_2, BATCH_LEN);
-	print_matrix((float **)nn_l2, N_2, BATCH_LEN);
-	ReLU((float **)nn_l2, N_2, BATCH_LEN);
-	print_matrix((float **)nn_l1, N_1, BATCH_LEN);
-	matrix_multiply((float **)nn_w3, N_OUT, N_2,
-					(float **)nn_l2, N_2, BATCH_LEN,
-					out, class_num, batch_num);
-	print_matrix(out, class_num, batch_num);
-	ReLU(out, class_num, batch_num);
-	print_matrix(out, class_num, batch_num);
+void nn(float *in, int in_row, int in_col,
+	    float *out, int out_row, int out_col) {
+	// check whether the rows of input and output equal
+	if (in_row != out_row || in_col != N_IN || out_col != N_OUT)
+		return;
+	matrix_multiply(in, in_row, in_col,
+					(float *)nn_w1, N_IN, N_1,
+					(float *)nn_l1, in_row, N_1);
+	ReLU((float *)nn_l1, in_row, N_1);
+
+	matrix_multiply((float *)nn_l1, in_row, N_1,
+					(float *)nn_w2, N_1, N_2,
+					(float *)nn_l2, in_row, N_2);
+	ReLU((float *)nn_l2, in_row, N_2);
+
+	matrix_multiply((float *)nn_l2, in_row, N_2,
+					(float *)nn_w3, N_2, N_OUT,
+					out, out_row, out_col);
+	ReLU(out, out_row, out_col);
 }
 
 /*
- * pack: pack out to batch_data
+ * pack: pack out to batch_data. 
+ * out_col should equal to N_OUT as we read continuously!
  */
-void pack(float **out, int class_num, int batch_num) {
-	for (int j = 0; j < batch_num; ++j) {
+void pack(float *out, int out_row, int out_col) {
+	for (int i = 0; i < out_row; ++i) {
 		float max = 0;
 		uint8_t max_index = 0;
+		float *line = out + i * out_col; // record to save energy
 		// go through the out array and find out argmax-index
-		for (int i = 0; i < class_num; ++i) {
-			if (out[i][j] > max) {
-				max = out[i][j];
-				max_index = i;
+		for (int j = 0; j < out_col; ++j) {
+			if (*line > max) {
+				max = *(line++);
+				max_index = j;
 			}
 		}
 		batch_data[len_of_batch++] = max_index;
+		// Serial.printf("max index is %d (%d)\r\n", max_index, len_of_batch);
 	}
 }
 
 /*
  * print_matrix
  */
-inline void print_matrix(float **m, int row, int col) {
-	Serial.println("matrix:");
+/*inline void print_matrix(float *m, int row, int col) {
 	for (int i = 0; i < row; ++i) {
 		for (int j = 0; j < col; ++j)
-			Serial.printf("%f ", m[i][j]);
+			Serial.printf("%f ", *(m+i*col+j));
 		Serial.printf("\r\n");
 	}
-}
+	Serial.printf("\r\n");
+}*/
 
 /*************************************************************************
  * Other settings for local connector
@@ -212,32 +224,35 @@ void init_card() {
 
 
 /*
- * read_line - read the first readcnt floats in a line from myFile
- * Parameter - Line: a line to store the floats
- *			 - readcnt: number of floats to read from this line
+ * read_matrix
+ * Parameter - in: the matrix to store read values, size is in_row*in_col
  */
-void read_line(float *Line, int readcnt) {
+void read_matrix(float *in, int in_row, int in_col) {
 	String readString = ""; // clear string
-	// read FEATURE_NUM float from one line, note readcnt should less than max-of-uint16_t
-	for (int i = 0; i < readcnt && myFile.available(); ++i) {
-		// read until finish reading one float
-		char byte = myFile.read();
-		while (byte != ' ' && byte != '\n') {
-			readString += byte;
-			byte = myFile.read();
+	for (int i = 0; i < in_row && myFile.available(); ++i) {
+		// record the start pointer of i_th line, save energy
+		float *line = in + i * in_col;
+		// read FEATURE_NUM float from one line
+		for (int j = 0; j < in_col && myFile.available(); ++j) {
+			// read until finish reading one float
+			char byte = myFile.read();
+			while (byte != ' ' && byte != '\n') {
+				readString += byte;
+				byte = myFile.read();
+			}
+			if (byte == '\n') // accidentally meet the end of line, return
+				return;
+			// finish reading one float, convert it
+			float readFloat = readString.toFloat();
+			*(line++) = readFloat; // add the float to readLine
+			readString = ""; // clear inString
 		}
-		if (byte == '\n') // accidentally meet the end of line, return
-			return;
-		// finish reading one float, convert it
-		float readFloat = readString.toFloat();
-		Line[i] = readFloat; // add the float to readLine
-		readString = ""; // clear inString
-	}
-	// if read until end of line, move on
-	while (myFile.available()) {
-		char byte = myFile.read();
-		if (byte == '\n')
-			break;
+		// read until end of this line, move on
+		while (myFile.available()) {
+			char byte = myFile.read();
+			if (byte == '\n')
+				break;
+		}
 	}
 	return;
 }
@@ -255,22 +270,20 @@ uint8_t read_data_file(int cur_sample_rate) {
 	myFile = SD.open(filename); // open the file
 	myFile.seek(position); // locate the last time of reading
 	if (myFile) {
-		// read sample_rate lines from myFile, note cur_sample_rate should be less than max-of-uint16_t
-		for (int i = 0; i < cur_sample_rate && myFile.available(); ++i) {
+		// read sample_rate lines from myFile
+		for (int i = 0; i < cur_sample_rate && myFile.available(); i+=BATCH_LEN) {
+			// read and process BATCH_LEN lines each time 
 			read_start = millis();
-			// read FEATURE floats in one line and store them in readLine
-			read_line(readLine, FEATURE_NUM);
-			// copy readLine to nn_in, there is only one line here
-			for (int j = 0; j < FEATURE_NUM; ++j)
-				nn_in[j][0] = readLine[j];
-			print_matrix((float **)nn_in, N_IN, BATCH_LEN);
+			// calculate the len of this batch, less than BATCH_LEN if exceeds cur_sample_rate
+			int len = min(cur_sample_rate - i, BATCH_LEN);
+			read_matrix((float *)nn_in, len, N_IN);
 
 			comp_start = millis();
 			read_time += comp_start - read_start; // cumulative add
 			// compute argmax-index data for this line
-			nn((float **)nn_in, FEATURE_NUM, BATCH_LEN, (float **)nn_out, CLASSES_NUM);
+			nn((float *)nn_in, len, N_IN, (float *)nn_out, len, N_OUT);
 			// pack the result into send batch
-			pack((float **)nn_out, CLASSES_NUM, BATCH_LEN);
+			pack((float *)nn_out, len, N_OUT);
 			comp_time += millis() - comp_start; // cumulative add
 		}
 		
@@ -348,13 +361,15 @@ void setup() {
 			// set bandwidth and sample rate
 			sprintf(send_info, "%d %d", bw[bw_index], sample_rate[sample_index]);
 			if (client.isConnected()) {
-				client.publish(parameter_topic, (uint8_t *)send_info, strlen(send_info), false, client.QOS2, false, NULL);
+				client.publish(parameter_topic, (uint8_t *)send_info, strlen(send_info), 
+					false, client.QOS2, false, NULL);
 				while (!client.loop_QoS2()); // block and wait for pub done
 			}
 			// sync time
 			sprintf(send_info, "%ld", millis());
 			if (client.isConnected()) {
-				client.publish(sync_topic, (uint8_t *)send_info, strlen(send_info), false, client.QOS2, false, NULL);
+				client.publish(sync_topic, (uint8_t *)send_info, strlen(send_info), 
+					false, client.QOS2, false, NULL);
 				while (!client.loop_QoS2()); // block and wait for pub done
 			}
 
@@ -367,7 +382,7 @@ void setup() {
 
 			// start reading!
 			prev_time = millis();
-			// Serial.printf("prev_time %ld\n", prev_time);
+			send_num = total_read_t = total_comp_t = 0;
 			while (1) {
 				len_of_batch = 0;
 				read_time = comp_time = 0; // clear and ready for cumulative add
@@ -378,7 +393,8 @@ void setup() {
 				// publish
 				if (client.isConnected()) {
 					// topic, payload, plength, retain, qos, dup, messageid
-					client.publish(data_topic, batch_data, len_of_batch, false, client.QOS2, false, NULL);
+					client.publish(data_topic, batch_data, len_of_batch, 
+						false, client.QOS2, false, NULL);
 					while (!client.loop_QoS2()); // block and wait for pub done
 					Serial.printf("%d %d %d publish successfully\r\n", bw[bw_index], 
 						sample_rate[sample_index], len_of_batch);
@@ -386,7 +402,7 @@ void setup() {
 				
 				cur_time = millis();
 				// Serial.printf("cur_time %ld\r\n", cur_time);
-				sleep_time = 1000 - (cur_time - prev_time);
+				sleep_time = SEND_INTERVAL - (cur_time - prev_time);
 				if (sleep_time > 0) {
 					delay(sleep_time); // delay sleep_time milliseconds
 					sprintf(write_buffer, "S\tprev:%ld\tcur:%ld\tsleep:%ld\tlen:%d\tc:%ld\tr:%ld\tready:%ld\r\n", 
@@ -401,7 +417,11 @@ void setup() {
 				Serial.print(write_buffer);
 
 				prev_time = millis(); // update prev_time
-				// Serial.printf("prev_time %ld\r\n", prev_time);
+				
+				// update total time
+				total_read_t += read_time;
+				total_comp_t += comp_time;
+				send_num++;
 				
 				if (end) // read until the end of file, ending this round of bandwidth and sample rate
 					break;
@@ -409,7 +429,15 @@ void setup() {
 			send_sleep_time(); // send tmp.txt for this round
 		}
 	}
-
+	// compute the avg time consumption and send it
+	float read_avg = (float)total_read_t / send_num;
+	float comp_avg = (float)total_comp_t / send_num;
+	sprintf(write_buffer, "read avg:%f\tcomp avg:%f\r\n", read_avg, comp_avg);
+	if (client.isConnected()) {
+		client.publish(tmp_topic, (uint8_t *)write_buffer, strlen(write_buffer), 
+			false, client.QOS2, false, NULL);
+		while (!client.loop_QoS2()); // block and wait for pub done
+	}
 	client.disconnect();
 }
 

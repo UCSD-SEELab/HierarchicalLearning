@@ -1,0 +1,3 @@
+N	prev:241534	cur:244205	sleep:-1671	len:380	c:1949	r:711	ready:2661
+N	prev:244223	cur:246888	sleep:-1665	len:380	c:1962	r:691	ready:2654
+N	prev:246895	cur:248573	sleep:-678	len:240	c:1240	r:429	ready:1670
