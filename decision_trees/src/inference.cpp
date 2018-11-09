@@ -78,4 +78,58 @@ int accInterval(float *feats) {
 	return retVal;
 }
 
- 
+size_t readField(File* file, char* str, size_t size, const char* delim) {
+  char ch;
+  size_t n = 0;
+  while ((n + 1) < size && file->read(&ch, 1) == 1) {
+    // Delete CR.
+    if (ch == '\r') {
+      continue;
+    }
+    str[n++] = ch;
+    if (strchr(delim, ch)) {
+        break;
+    }
+  }
+  str[n] = '\0';
+  return n;
+} 
+
+void processData(File file)
+{
+	long i; 
+	int j, result;
+	size_t n;
+	char str[15], *ptr;
+	float featarray[9];
+	unsigned long start, end, tot;
+
+	tot = 0;
+
+	for (i = 0; i < 174640; i++) {
+		for (j = 0; j < 9; j++) {
+			n = readField(&file, str, sizeof(str), ",\n");
+			
+			if (n == 0) errorHalt("too less lines");
+			featarray[j] = strtof(str, &ptr);
+
+			while (*ptr == ' ')
+				ptr++;
+
+			if (*ptr != ',' && *ptr != '\n' && *ptr != '\0')
+				errorHalt("extra characters in field");
+      		
+			/*Serial.print(featarray[j]);
+			Serial.print(",");*/
+		}
+		/*Serial.println();
+		Serial.println(accInterval(featarray));*/
+		start = micros();
+		result = accInterval(featarray);
+		end = micros();
+		tot += (end - start);
+
+	}
+	Serial.print("Time elapsed (micro seconds):");
+	Serial.println(tot);
+}
