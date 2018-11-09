@@ -5,25 +5,15 @@
  * Author: Xiaofan Yu
  * Date: 10/13/2018
  */
-#define NUM_OF_SR 11 // number of sameple rate choices
-#define NUM_OF_BW 3 // number of bandwidth choices
-#define FEATURE_NUM 12 // number of floats read from each line
-#define MAX_BATCH_LENGTH 9600 // maximum length of sending batch
-#define MAX_INFO_LENGTH 100 // maximum length of sending info, e.g. bw and sample rate
 #include "application.h"
 #include "MQTT.h"
 #include "sd-card-library-photon-compat.h"
 
-// #define DEBUG_LOCAL_CONNECTOR // DEBUG mode
-#ifdef DEBUG_LOCAL_CONNECTOR
- #define DEBUG_PRINTLN  Serial.println
- #define DEBUG_PRINT Serial.print
- #define DEBUG_PRINTF Serial.printf
-#else
- #define DEBUG_PRINTLN
- #define DEBUG_PRINT
- #define DEBUG_PRINTF
-#endif
+#define NUM_OF_SR 11 // number of sameple rate choices
+#define NUM_OF_BW 3 // number of bandwidth choices
+#define FEATURE_NUM 12 // number of floats read from each line
+#define MAX_BATCH_LENGTH 19200 // maximum length of sending batch
+#define MAX_INFO_LENGTH 100 // maximum length of sending info, e.g. bw and sample rate
 
 // const variables in experiments
 const int sample_rate[] = {200, 220, 240, 260, 280, 300, 320, 340, 360, 380, 400};
@@ -36,8 +26,6 @@ const char parameter_topic[] = "parameter"; // for sending bandwidth and sample 
 const char sync_topic[] = "sync"; // for sync, send current time
 
 /* global variables for MQTT */
-void callback(char* topic, byte* payload, unsigned int length);
-
 byte server[] = { 137,110,160,230 }; // specify the ip address of RPi
 MQTT client(server, 1883, 60, callback, MAX_BATCH_LENGTH+10); // ip, port, keepalive, callback, maxpacketsize=
 
@@ -64,8 +52,6 @@ const char tmpname[] = "tmp.txt";
 char write_buffer[MAX_INFO_LENGTH];
 
 // string and float to hold float input
-String inString = "";
-float inFloat;
 uint8_t batch_data[MAX_BATCH_LENGTH+10]; // send batch, can not use string cuz it is too long
 uint32_t len_of_batch = 0; // current length of batch_data
 char send_info[MAX_INFO_LENGTH];
@@ -102,8 +88,10 @@ inline uint8_t batch_append(float data) {
 	if (len_of_batch >= MAX_BATCH_LENGTH-2) // no placy to append, return failure
 		return 0;
 	uint8_t *data_byte = (uint8_t *)&data; // convert the pointer
-	batch_data[len_of_batch++] = *(data_byte); // append lower byte to send batch
-	batch_data[len_of_batch++] = *(data_byte + 1); // append higher byte to send batch
+	batch_data[len_of_batch++] = *(data_byte); // append 1st byte to send batch
+	batch_data[len_of_batch++] = *(data_byte + 1); // append 2nd byte to send batch
+	batch_data[len_of_batch++] = *(data_byte + 2); // append 3rd byte to send batch
+	batch_data[len_of_batch++] = *(data_byte + 3); // append 4th byte to send batch
 	return 1;
 }
 
@@ -111,7 +99,7 @@ inline uint8_t batch_append(float data) {
  * read_line - read one line from myFile, each line read first readcnt floats in 36 floats
  */
 inline void read_line(unsigned int readcnt) {
-	inString = ""; // clear string
+	String inString = ""; // clear string
 	// read readcnt float from one line
 	for (int i = 0; i < readcnt && myFile.available(); ++i) {
 		// read until finish reading one float
@@ -124,7 +112,6 @@ inline void read_line(unsigned int readcnt) {
 			return;
 		// finish reading one float, convert it
 		float inFloat = inString.toFloat();
-		DEBUG_PRINTF("%f ", inFloat);
 		batch_append(inFloat); // append to the sending batch
 		inString = ""; // clear inString
 	}
@@ -245,8 +232,6 @@ void setup() {
 
 			// start reading!
 			prev_time = millis();
-			// 
-		Serial.printf("prev_time %ld\n", prev_time);
 			while (1) {
 				len_of_batch = 0; // clear sending batch
 				read_time = 0; // clear and ready for cumulative add
@@ -263,7 +248,6 @@ void setup() {
 				}
 				
 				cur_time = millis();
-				// Serial.printf("cur_time %ld\r\n", cur_time);
 				sleep_time = 1000 - (cur_time - prev_time);
 				if (sleep_time > 0) {
 					delay(sleep_time); // delay sleep_time milliseconds
@@ -279,7 +263,6 @@ void setup() {
 				Serial.print(write_buffer);
 
 				prev_time = millis(); // update prev_time
-				// Serial.printf("prev_time %ld\r\n", prev_time);
 
 				if (end) // read until the end of file, ending this round of bandwidth and sample rate
 					break;

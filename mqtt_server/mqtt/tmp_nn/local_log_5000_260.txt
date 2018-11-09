@@ -1,0 +1,4 @@
+N	prev:197540	cur:199365	sleep:-825	len:260	c:1350	r:467	ready:1817
+N	prev:199381	cur:201213	sleep:-832	len:260	c:1339	r:481	ready:1822
+N	prev:201220	cur:203043	sleep:-823	len:260	c:1334	r:480	ready:1815
+N	prev:203050	cur:204591	sleep:-541	len:220	c:1126	r:404	ready:1531

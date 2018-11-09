@@ -5,22 +5,19 @@
  * Author: Xiaofan Yu
  * Date: 11/2/2018
  */
-// put it here to avoid "was not declared error"
-#define NUM_OF_SR 11 // number of sameple rate choices
-#define NUM_OF_BW 3 // number of bandwidth choices
-#define MAX_INFO_LENGTH 100 // maximum length of sending info, e.g. bw and sample rate
-#define MAX_RAND_NUM 1000000 // maximum number in random()
-#define FEATURE_NUM 12 // number of features, linear regression input
-#define CLASSES_NUM 18 // number of classes, linear regression output
-#define MAX_SAMPLE_RATE 400 // maximum sample rate
-#define HALF_LOOKUP_LENGTH 25 // half of lookup table's length
-#define LOOKUP_LENGTH 50 // lookup table is [0, 50]
-#define HALF_LOOKUP_RANGE 5 // half of the numerical range 
-
 #include "application.h"
 #include "MQTT.h"
 #include "sd-card-library-photon-compat.h"
 #include "math.h"
+
+#define NUM_OF_SR 11 // number of sameple rate choices
+#define NUM_OF_BW 3 // number of bandwidth choices
+#define MAX_INFO_LENGTH 100 // maximum length of sending info, e.g. bw and sample rate
+#define MAX_RAND_NUM 1000000 // maximum number in random()
+#define SEND_INTERVAL 1000 // the interval in ms of each iteration
+#define FEATURE_NUM 12 // number of features, linear regression input
+#define CLASSES_NUM 18 // number of classes, linear regression output
+#define MAX_SAMPLE_RATE 400 // maximum sample rate
 
 // const variables in experiments
 const int sample_rate[] = {200, 220, 240, 260, 280, 300, 320, 340, 360, 380, 400};
@@ -33,8 +30,6 @@ const char parameter_topic[] = "parameter"; // for sending bandwidth and sample 
 const char sync_topic[] = "sync"; // for sync, send current time
 
 /* global variables for MQTT */
-void callback(char* topic, byte* payload, unsigned int length);
-
 byte server[] = { 137,110,160,230 }; // specify the ip address of RPi
 MQTT client(server, 1883, 60, callback, MAX_SAMPLE_RATE+10); // ip, port, keepalive, callback, maxpacketsize=
 
@@ -62,7 +57,7 @@ char write_buffer[MAX_INFO_LENGTH]; // to store the info sent to RPi
 // const char boostname[] = "lr.txt";
 
 // global array to store float data
-float lr_para[FEATURE_NUM][CLASSES_NUM]; // parameters for linear regression
+float lr_para[CLASSES_NUM][FEATURE_NUM]; // parameters for linear regression
 float readLine[FEATURE_NUM], outputLine[CLASSES_NUM]; // to store a line
 uint8_t batch_data[MAX_SAMPLE_RATE+10]; // send batch
 unsigned int len_of_batch = 0; // len of send batch
@@ -72,6 +67,8 @@ unsigned long prev_time, cur_time; // to store measured time
 unsigned long comp_start, comp_time; // to record the start and time of computation
 unsigned long read_start, read_time; // to record the start and time of reading
 unsigned long ready_time; // total time of computation and reading
+unsigned long total_comp_t, total_read_t; // to record the total time for calculating avg
+unsigned int send_num = 0; // the number of times it sends
 long sleep_time; // to store sleep time, should be signed
 
 /*************************************************************************
@@ -82,8 +79,8 @@ long sleep_time; // to store sleep time, should be signed
  */
 void init_lr_parameter() {
 	long randNum;
-	for (uint8_t i = 0; i < FEATURE_NUM; ++i)
-		for (uint8_t j = 0; j < CLASSES_NUM; ++j) {
+	for (uint8_t i = 0; i < CLASSES_NUM; ++i)
+		for (uint8_t j = 0; j < FEATURE_NUM; ++j) {
 			randNum = random(0, MAX_RAND_NUM);
 			lr_para[i][j] = ((float)(randNum - MAX_RAND_NUM)) / MAX_RAND_NUM;
 			// Serial.printf("%f ", para_num[i][j]);
@@ -91,28 +88,35 @@ void init_lr_parameter() {
 }
 
 /*
- * matrix_multiply: m1*m2=res
+ * vector_multiply: m1*m2=res, m1 is a vector, m2 is a matrix.
+ * Different from normal vector multiply, each time m1*(one row in m2)
+ * This modification is for easiness in accessing.
  */
-void vector_multiply(float (&m1)[FEATURE_NUM], float (&m2)[FEATURE_NUM][CLASSES_NUM],
-	float (&res)[CLASSES_NUM]) {
-	for (int i = 0; i < CLASSES_NUM; ++i) {
+void vector_multiply(float *m1, int num_m1, float *m2, int row_m2, int col_m2,
+	float *res, int num_res) {
+	// check for multiplication validation
+	if (num_m1 != col_m2 || row_m2 != num_res)
+		return;
+	for (int i = 0; i < num_res; ++i) {
 		float tmp = 0;
-		for (int j = 0; j < FEATURE_NUM; ++j)
-			tmp += m1[j] * m2[j][i];
-		res[i] = tmp;
+		// record the start pointer of i_th line of m2, to save energy
+		float *line_m2 = m2 + i * col_m2;
+		for (int j = 0; j < num_m1; ++j)
+			tmp += *(m1++) * *(line_m2++);
+		*(res++) = tmp;
 	}
 }
 
 /*
- * pack: pack out to batch_data
+ * pack: pack out to batch_data. Read continuously!
  */
 void pack(float *out, int class_num) {
 	float max = 0;
 	uint8_t max_index = 0;
 	// go through the out array and find out argmax-index
 	for (int i = 0; i < class_num; ++i) {
-		if (out[i] > max) {
-			max = out[i];
+		if (*out > max) {
+			max = *(out++);
 			max_index = i;
 		}
 	}
@@ -194,7 +198,8 @@ uint8_t read_data_file(int cur_sample_rate) {
 			comp_start = millis();
 			read_time += comp_start - read_start; // cumulative add
 			// compute argmax-index data for this line
-			vector_multiply(readLine, lr_para, outputLine);
+			vector_multiply(readLine, FEATURE_NUM, (float *)lr_para, CLASSES_NUM, FEATURE_NUM, 
+				outputLine, CLASSES_NUM);
 			// pack the result into send batch
 			pack(outputLine, CLASSES_NUM);
 			//pack(readLine, FEATURE_NUM);
@@ -294,7 +299,7 @@ void setup() {
 
 			// start reading!
 			prev_time = millis();
-			// Serial.printf("prev_time %ld\n", prev_time);
+			send_num = total_read_t = total_comp_t = 0;
 			while (1) {
 				len_of_batch = 0;
 				read_time = comp_time = 0; // clear and ready for cumulative add
@@ -313,7 +318,7 @@ void setup() {
 				
 				cur_time = millis();
 				// Serial.printf("cur_time %ld\r\n", cur_time);
-				sleep_time = 1000 - (cur_time - prev_time);
+				sleep_time = SEND_INTERVAL - (cur_time - prev_time);
 				if (sleep_time > 0) {
 					delay(sleep_time); // delay sleep_time milliseconds
 					sprintf(write_buffer, "S\tprev:%ld\tcur:%ld\tsleep:%ld\tlen:%d\tc:%ld\tr:%ld\tready:%ld\r\n", 
@@ -328,7 +333,11 @@ void setup() {
 				Serial.print(write_buffer);
 
 				prev_time = millis(); // update prev_time
-				// Serial.printf("prev_time %ld\r\n", prev_time);
+				
+				// update total time
+				total_read_t += read_time;
+				total_comp_t += comp_time;
+				send_num++;
 				
 				if (end) // read until the end of file, ending this round of bandwidth and sample rate
 					break;
@@ -336,7 +345,15 @@ void setup() {
 			send_sleep_time(); // send tmp.txt for this round
 		}
 	}
-
+	// compute the avg time consumption and send it
+	float read_avg = (float)total_read_t / send_num;
+	float comp_avg = (float)total_comp_t / send_num;
+	sprintf(write_buffer, "read avg:%f\tcomp avg:%f\r\n", read_avg, comp_avg);
+	if (client.isConnected()) {
+		client.publish(tmp_topic, (uint8_t *)write_buffer, strlen(write_buffer), 
+			false, client.QOS2, false, NULL);
+		while (!client.loop_QoS2()); // block and wait for pub done
+	}
 	client.disconnect();
 }
 
