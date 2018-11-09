@@ -1,4 +1,0 @@
-S	prev:32946	cur:33503	sleep:443	len:6720	r:501	ready:501
-S	prev:33961	cur:34523	sleep:438	len:6720	r:501	ready:503
-N	prev:34968	cur:36850	sleep:-882	len:6720	r:493	ready:494
-S	prev:36857	cur:37191	sleep:666	len:3840	r:278	ready:280

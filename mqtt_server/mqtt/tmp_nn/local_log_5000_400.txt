@@ -1,4 +1,0 @@
-N	prev:248617	cur:251425	sleep:-1808	len:400	c:2058	r:742	ready:2800
-N	prev:251441	cur:254242	sleep:-1801	len:400	c:2062	r:730	ready:2793
-N	prev:254249	cur:255649	sleep:-400	len:200	c:1029	r:361	ready:1391
-read avg:611.000000	comp avg:1716.333374

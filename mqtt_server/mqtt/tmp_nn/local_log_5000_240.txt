@@ -1,5 +1,0 @@
-N	prev:188659	cur:190347	sleep:-688	len:240	c:1233	r:446	ready:1679
-N	prev:190362	cur:192053	sleep:-691	len:240	c:1233	r:448	ready:1683
-N	prev:192060	cur:193745	sleep:-685	len:240	c:1242	r:434	ready:1677
-N	prev:193752	cur:195468	sleep:-716	len:240	c:1237	r:432	ready:1670
-S	prev:195475	cur:195765	sleep:710	len:40	c:208	r:71	ready:280

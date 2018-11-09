@@ -1,5 +1,0 @@
-S	prev:8222	cur:8647	sleep:575	len:200	c:32	r:385	ready:417
-S	prev:9237	cur:9672	sleep:565	len:200	c:37	r:386	ready:425
-S	prev:10244	cur:10672	sleep:572	len:200	c:26	r:392	ready:419
-S	prev:11251	cur:11675	sleep:576	len:200	c:29	r:385	ready:416
-S	prev:12263	cur:12681	sleep:582	len:200	c:33	r:376	ready:410
