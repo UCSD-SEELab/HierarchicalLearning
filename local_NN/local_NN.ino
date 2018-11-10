@@ -15,9 +15,9 @@
 // size of neural network
 #define N_IN FEATURE_NUM // nodes as input
 #define N_OUT CLASSES_NUM // nodes as output
-#define N_1 80 // nodes in the first layer
-#define N_2 80 // nodes in the second layer
-#define BATCH_LEN 2 // the number of input samples for one time
+#define N_1 98 // nodes in the first layer
+#define N_2 98 // nodes in the second layer
+#define BATCH_LEN 1 // the number of input samples for one time
 
 // const variables in experiments
 const float sample_data[FEATURE_NUM] = {1.5663333, 2.0231032, 4.368568, -0.7739354,
@@ -88,16 +88,16 @@ void matrix_multiply(float *m1, int row_m1, int col_m1,
 		// record the start pointer of i_th line in m1 and res
 		float *line_m1 = m1 + i * col_m1;
 		float *line_res = res + i * col_res;
-		for (int j = 0; j < col_res; ++j) {
-			float tmp = 0;
-			// record the start pointer of j_th column in m2, save energy
-			float *column_m2 = m2 + j;
-			for (int k = 0; k < col_m1; ++k) {
-				// tmp += *(line_m1 + k) * *(column_m2 + k * col_m2);
-				tmp += *(line_m1++) * *column_m2;
-				column_m2 += col_m2;
+		// walk through each line of m2
+		for (int k = 0; k < col_m1; ++k) {
+			float *line_m2 = m2 + k * col_m2;
+			float tmp = 0, tmp_m2 = *line_m2;
+			// multiply each element in line m1 and certain element in m2
+			for (int j = 0; j < col_res; ++j) {
+				tmp += *(line_m1++) * tmp_m2;
 			}
-			*(line_res++) = tmp; // set the value
+			*(line_res++) += tmp; // add this to each element in res
+			line_m2++;
 		}
 	}
 }

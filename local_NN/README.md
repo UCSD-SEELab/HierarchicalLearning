@@ -23,4 +23,4 @@ particle compile p --saveTo nn.bin
 ```
 
 ## Test Result
-Suppose N_1 = N_2 = N, BATCH_LEN = 1, the maximum N we can have is 90. Letting N = 95 will crash down.
+Suppose N_1 = N_2 = N, BATCH_LEN = 1, the maximum N we can have is 98. Letting N = 99 will crash down. It seems the upper limit of .bss space is 49k.
