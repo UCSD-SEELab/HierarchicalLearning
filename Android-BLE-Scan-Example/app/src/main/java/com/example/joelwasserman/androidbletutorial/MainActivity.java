@@ -124,10 +124,8 @@ public class MainActivity extends AppCompatActivity {
 
         //MQTT - connect to broker
         String clientId = MqttClient.generateClientId();
-        client =  new MqttAndroidClient(this.getApplicationContext(), "tcp://test.mosquitto.org:1883",
-                clientId);
-//        client =  new MqttAndroidClient(this.getApplicationContext(), "tcp://192.168.10.6:61613",
-//                        clientId);
+//        client =  new MqttAndroidClient(this.getApplicationContext(), "tcp://192.168.1.2:1883",  clientId);
+        client =  new MqttAndroidClient(this.getApplicationContext(), "tcp://192.168.10.6:61613", clientId);
         MqttConnectOptions options = new MqttConnectOptions();
         options.setUserName("admin");
         options.setPassword("IBMProject$".toCharArray());
